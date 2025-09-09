@@ -1,381 +1,346 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MiniInvest - App Chứng Khoán (Demo)</title>
-
-  <!-- lightweight-charts (candlestick) -->
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-
-  <style>
-    :root{
-      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#0ea5a4;
-      --green:#16a34a; --red:#ef4444; --panel:#071028;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    }
-    html,body{height:100%; margin:0; background:linear-gradient(180deg,#071023 0%, #071029 100%); color:#e6eef6;}
-    .wrap{max-width:1100px; margin:12px auto; padding:12px;}
-    header{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
-    .brand{display:flex; gap:12px; align-items:center;}
-    .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#0369a1);display:flex;align-items:center;justify-content:center;font-weight:700;}
-    .title{font-size:18px;font-weight:600}
-    .sub{color:var(--muted); font-size:13px}
-    .grid{display:grid; grid-template-columns: 300px 1fr 300px; gap:12px; align-items:start;}
-    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03); padding:10px; border-radius:10px;}
-    .ticker{display:flex;justify-content:space-between; padding:8px; border-radius:8px; cursor:pointer;}
-    .ticker:hover{background:rgba(255,255,255,0.02)}
-    .sym{font-weight:700}
-    .price{font-weight:600}
-    .pct{font-size:13px}
-    .green{color:var(--green)}
-    .red{color:var(--red)}
-    .chart-wrap{height:520px; display:flex; flex-direction:column;}
-    #chart{flex:1; min-height:420px;}
-    .tf-btns{display:flex; gap:6px; margin-bottom:8px}
-    .btn{padding:6px 10px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.02); cursor:pointer; font-size:13px}
-    .btn.active{background:var(--accent); color:#022; font-weight:700}
-    .order-row{display:flex; gap:8px; margin-bottom:8px}
-    input[type=number], input[type=text], input[type=password]{width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); background:transparent; color:inherit}
-    .small{font-size:13px; color:var(--muted)}
-    footer{margin-top:12px; text-align:center; color:var(--muted); font-size:13px}
-    /* responsive */
-    @media (max-width:980px){ .grid{grid-template-columns:1fr; } .chart-wrap{height:420px} }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ChatBot Demo — AppsGeyser</title>
+<style>
+  :root{ --bg:#0b1220; --card:#071021; --accent:#06b6d4; --muted:#9aa8b7; color-scheme: dark; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+  html,body{height:100%; margin:0; background:linear-gradient(180deg,#051019,#071028); color:#e6eef6}
+  .wrap{max-width:900px;margin:12px auto;padding:12px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .logo{display:flex;gap:10px;align-items:center}
+  .logo-box{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#0369a1);display:flex;align-items:center;justify-content:center;font-weight:700}
+  .title{font-weight:700}
+  .sub{color:var(--muted);font-size:13px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:10px; padding:12px; border:1px solid rgba(255,255,255,0.03)}
+  .chat-window{height:60vh; overflow:auto; padding:12px; margin:10px 0; border-radius:8px; background:linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.08)); border:1px solid rgba(255,255,255,0.02)}
+  .msg{display:flex; margin-bottom:10px}
+  .msg.me{justify-content:flex-end}
+  .bubble{max-width:75%; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,0.03); color:inherit}
+  .bubble.me{background:linear-gradient(90deg,#065f46,#0ea5a4); color:#022}
+  .meta{font-size:12px; color:var(--muted); margin-bottom:6px}
+  .controls{display:flex; gap:8px; align-items:center}
+  input[type=text], textarea{width:100%; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:inherit}
+  button{padding:8px 12px; border-radius:8px; border: none; background:var(--accent); color:#022; font-weight:600; cursor:pointer}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.03); color:var(--muted)}
+  .small{font-size:13px;color:var(--muted)}
+  .row{display:flex; gap:8px; align-items:center}
+  .sticky-bottom{position:sticky; bottom:0; background:linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.02)); padding-top:6px}
+  .badge{font-size:12px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02); color:var(--muted)}
+  .switch{display:inline-flex; align-items:center; gap:6px}
+  .export-area{width:100%; height:90px; margin-top:8px; padding:8px; border-radius:8px; background:transparent; border:1px dashed rgba(255,255,255,0.03); color:var(--muted)}
+  @media (max-width:720px){ .chat-window{height:55vh} }
+</style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <div class="brand">
-        <div class="logo">MI</div>
+      <div class="logo">
+        <div class="logo-box">CB</div>
         <div>
-          <div class="title">MiniInvest — Ứng dụng Chứng khoán (Demo)</div>
-          <div class="sub">Trang mô phỏng tương tự vn.investing.com — phù hợp để đóng gói app trên AppsGeyser</div>
+          <div class="title">ChatBot Auto — Demo</div>
+          <div class="sub">Dán file này vào AppsGeyser để tạo app chat tự động</div>
         </div>
       </div>
-      <div style="display:flex; gap:12px; align-items:center;">
-        <div id="clock" class="sub small">—</div>
-        <button id="loginBtn" class="btn">Login</button>
-      </div>
+      <div class="small">Local demo · No server</div>
     </header>
 
-    <div class="grid">
-      <!-- left: tickers -->
-      <div class="card" style="height:520px; overflow:auto;">
-        <div style="display:flex;justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <div style="font-weight:700">Danh sách cổ phiếu</div>
-          <div class="small">Thời gian thực (mô phỏng)</div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:700">Cuộc trò chuyện</div>
+          <div class="small">Bot tự động / Lưu cục bộ (localStorage)</div>
         </div>
-        <div id="tickers"></div>
+        <div class="row">
+          <div class="switch">
+            <label class="small">Auto-generate</label>
+            <input id="autoToggle" type="checkbox" />
+          </div>
+          <button id="clearBtn" class="btn-ghost">Xóa</button>
+        </div>
       </div>
 
-      <!-- center: chart -->
-      <div class="card chart-wrap">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <div>
-            <div id="activeSym" style="font-weight:800; font-size:18px">AAPL</div>
-            <div class="small" id="activeName">Apple Inc.</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:18px" id="activePrice">0.00</div>
-            <div id="activeChange" class="small">—</div>
-          </div>
-        </div>
+      <div id="chat" class="chat-window" aria-live="polite"></div>
 
-        <div class="tf-btns" id="tfBtns"></div>
-        <div id="chart"></div>
+      <div class="sticky-bottom">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+          <input id="inputMsg" type="text" placeholder="Nhập tin nhắn..." />
+          <button id="sendBtn">Gửi</button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input id="botName" type="text" placeholder="Tên bot (mặc định: Thảo)" style="width:200px" />
+          <button id="startConv" class="btn-ghost">Bot bắt chuyện</button>
+          <div style="flex:1"></div>
+          <div class="badge" id="statusBadge">Status: idle</div>
+        </div>
       </div>
 
-      <!-- right: order + admin -->
-      <div class="card" style="height:520px; display:flex; flex-direction:column; justify-content:flex-start;">
-        <div style="font-weight:700; margin-bottom:8px;">Place Order (Demo)</div>
-        <div class="small" style="margin-bottom:8px">Tài khoản demo — tiền ảo</div>
+      <hr style="margin:12px 0; border-color:rgba(255,255,255,0.03)" />
 
-        <div style="margin-bottom:8px;">
-          <label class="small">Side</label>
-          <div style="display:flex; gap:8px; margin-top:6px;">
-            <button id="buyBtn" class="btn active">Buy</button>
-            <button id="sellBtn" class="btn">Sell</button>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:220px">
+          <div style="font-weight:700; margin-bottom:6px">Thiết lập</div>
+          <div class="small">Chu kỳ tự động (s)</div>
+          <input id="autoInterval" type="number" value="8" min="2" style="width:110px; margin-top:6px" />
+          <div class="small" style="margin-top:8px">Chế độ trả lời</div>
+          <select id="replyMode" style="margin-top:6px; width:220px">
+            <option value="smart">Smart (mẫu + keyword)</option>
+            <option value="echo">Echo (nhắc lại)</option>
+            <option value="random">Random (vui)</option>
+          </select>
+        </div>
+
+        <div style="flex:1; min-width:220px">
+          <div style="font-weight:700; margin-bottom:6px">Xuất/nhập lịch sử</div>
+          <div class="small">Export JSON</div>
+          <textarea id="exportBox" class="export-area" readonly></textarea>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button id="exportBtn" class="btn">Export</button>
+            <button id="importBtn" class="btn-ghost">Import (paste JSON)</button>
           </div>
         </div>
 
-        <div style="margin-bottom:8px;">
-          <label class="small">Quantity</label>
-          <input id="qty" type="number" value="1" min="1" />
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <label class="small">Price (market)</label>
-          <input id="orderPrice" type="text" readonly />
-        </div>
-
-        <button id="submitOrder" class="btn" style="width:100%; margin-bottom:12px;">Submit Order (Demo)</button>
-
-        <div style="border-top:1px dashed rgba(255,255,255,0.04); padding-top:10px; margin-top:8px;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-weight:700">Admin</div>
-            <div class="small">admin / admin123</div>
-          </div>
-          <div style="margin-top:8px;">
-            <input id="addSym" placeholder="Symbol (e.g. XYZ)" />
-            <input id="addName" placeholder="Company name" style="margin-top:6px"/>
-            <div style="display:flex; gap:8px; margin-top:8px;">
-              <button id="addBtn" class="btn" style="flex:1">Add</button>
-              <button id="removeBtn" class="btn" style="flex:1">Remove Selected</button>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top:12px; font-size:13px; color:var(--muted)">
-          <div>Đơn demo không thực hiện giao dịch thật. Thay API && persistence để dùng production.</div>
+        <div style="flex:1; min-width:220px">
+          <div style="font-weight:700; margin-bottom:6px">Thông tin nhanh</div>
+          <div class="small">- Bot mô phỏng: dễ tích hợp webhook hoặc API nếu bạn có server.</div>
+          <div class="small" style="margin-top:6px">- AppsGeyser có thể chặn remote scripts — nếu bot dùng API cần host backend riêng.</div>
         </div>
       </div>
     </div>
 
-    <footer>
-      <div>Built for AppsGeyser — copy file HTML vào AppsGeyser hoặc host và dùng URL</div>
+    <footer style="margin-top:10px; text-align:center; color:var(--muted); font-size:13px">
+      Built for AppsGeyser — Dán HTML này vào form tạo app.
     </footer>
   </div>
 
 <script>
-/*
-  MiniInvest single-file JS
-  - Simulate live prices per ticker
-  - Candlestick chart with lightweight-charts
-  - Timeframes (1m,5m,15m,30m,1h,1d) simulated
-  - Basic admin add/remove tickers (no persistence)
+/* ChatBot Auto — single-file JS
+ - Lưu lịch sử ở localStorage
+ - Auto-generate conversation khi bật (bot tự gửi theo chu kỳ)
+ - 3 chế độ trả lời: smart, echo, random
+ - Typing indicator, simple rule-based replies
 */
 
-const DEFAULT_TICKERS = [
-  { symbol: 'AAPL', name: 'Apple Inc.', price: 172.26, lastClose: 170.25 },
-  { symbol: 'MSFT', name: 'Microsoft Corp.', price: 333.92, lastClose: 330.12 },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 140.51, lastClose: 139.30 },
-  { symbol: 'TSLA', name: 'Tesla Inc.', price: 253.45, lastClose: 250.10 },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 151.22, lastClose: 150.00 },
-  { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 720.13, lastClose: 710.00 }
-];
-
-let tickers = JSON.parse(JSON.stringify(DEFAULT_TICKERS));
-let selectedSymbol = tickers[0].symbol;
-let side = 'buy';
-let chart; let candleSeries;
-let candleDataPerSymbol = {}; // store simulated candle arrays per symbol
-let currentTF = '1m';
-const TF_CONFIG = {
-  '1m': 60,
-  '5m': 60*5,
-  '15m': 60*15,
-  '30m': 60*30,
-  '1h': 60*60,
-  '1d': 60*60*24
+const CHAT_KEY = 'appsgeyser_chat_demo_v1';
+let state = {
+  messages: [], // {id, sender:'me'|'bot', text, time}
+  auto: false,
+  intervalSec: 8,
+  replyMode: 'smart',
+  botName: 'Thảo',
+  isTyping: false
 };
 
-// UI refs
-const tickersDiv = document.getElementById('tickers');
-const activeSym = document.getElementById('activeSym');
-const activeName = document.getElementById('activeName');
-const activePrice = document.getElementById('activePrice');
-const activeChange = document.getElementById('activeChange');
-const orderPrice = document.getElementById('orderPrice');
-const qtyInput = document.getElementById('qty');
-const buyBtn = document.getElementById('buyBtn');
-const sellBtn = document.getElementById('sellBtn');
-const submitOrder = document.getElementById('submitOrder');
-const addBtn = document.getElementById('addBtn');
-const removeBtn = document.getElementById('removeBtn');
-const addSymInput = document.getElementById('addSym');
-const addNameInput = document.getElementById('addName');
-const loginBtn = document.getElementById('loginBtn');
-const tfBtnsDiv = document.getElementById('tfBtns');
-const clockEl = document.getElementById('clock');
+const chatEl = document.getElementById('chat');
+const inputMsg = document.getElementById('inputMsg');
+const sendBtn = document.getElementById('sendBtn');
+const clearBtn = document.getElementById('clearBtn');
+const autoToggle = document.getElementById('autoToggle');
+const autoInterval = document.getElementById('autoInterval');
+const replyMode = document.getElementById('replyMode');
+const botNameInput = document.getElementById('botName');
+const startConvBtn = document.getElementById('startConv');
+const statusBadge = document.getElementById('statusBadge');
+const exportBox = document.getElementById('exportBox');
+const exportBtn = document.getElementById('exportBtn');
+const importBtn = document.getElementById('importBtn');
 
-// init clock
-setInterval(()=>{ const d=new Date(); clockEl.innerText = d.toLocaleString(); }, 1000);
+function uid(){ return 'm'+Math.random().toString(36).slice(2,9); }
+function now(){ return new Date().toISOString(); }
 
-// build TF buttons
-Object.keys(TF_CONFIG).forEach(tf=>{
-  const b = document.createElement('button');
-  b.className='btn'+(tf===currentTF? ' active':'');
-  b.innerText = tf;
-  b.onclick = ()=>{ setTimeframe(tf); Array.from(tfBtnsDiv.children).forEach(x=>x.classList.remove('active')); b.classList.add('active'); };
-  tfBtnsDiv.appendChild(b);
-});
-
-// init chart
-function initChart(){
-  const container = document.getElementById('chart');
-  container.innerHTML = '';
-  chart = LightweightCharts.createChart(container, {
-    width: container.clientWidth,
-    height: container.clientHeight,
-    layout: {background: 'rgba(0,0,0,0)', textColor: '#e6eef6'},
-    grid: { vertLines: {visible:false}, horzLines: {color: 'rgba(255,255,255,0.03)'}},
-    timeScale: { timeVisible: true, secondsVisible: false }
-  });
-  candleSeries = chart.addCandlestickSeries({
-    upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor:'#ef4444'
-  });
-  window.addEventListener('resize', ()=>chart.applyOptions({ width: container.clientWidth }));
+// persistence
+function loadState(){
+  try{
+    const raw = localStorage.getItem(CHAT_KEY);
+    if(raw){ state.messages = JSON.parse(raw); }
+  }catch(e){ console.warn('load failed', e); }
+}
+function saveState(){
+  try{ localStorage.setItem(CHAT_KEY, JSON.stringify(state.messages)); }catch(e){ console.warn('save failed', e); }
 }
 
-// generate initial candles
-function ensureCandles(sym){
-  if (candleDataPerSymbol[sym]) return candleDataPerSymbol[sym];
-  const base = (sym.charCodeAt(0) % 50) + 100;
-  const data = [];
-  const step = TF_CONFIG[currentTF];
-  let t = Math.floor(Date.now()/1000) - 3600*6; // last 6 hours
-  let lastClose = base + Math.random()*10;
-  for (let i=0;i<200;i++){
-    const open = +(lastClose * (1 + (Math.random()-0.5)/200)).toFixed(2);
-    const close = +(open * (1 + (Math.random()-0.5)/50)).toFixed(2);
-    const high = Math.max(open, close) * (1 + Math.random()/100);
-    const low = Math.min(open, close) * (1 - Math.random()/100);
-    data.push({ time: t, open: +open.toFixed(2), high: +high.toFixed(2), low: +low.toFixed(2), close: +close.toFixed(2) });
-    lastClose = close; t += step;
+// render
+function render(){
+  chatEl.innerHTML = '';
+  state.messages.forEach(m=>{
+    const container = document.createElement('div');
+    container.className = 'msg ' + (m.sender==='me'? 'me':'');
+    const meta = document.createElement('div');
+    meta.className = 'meta small';
+    meta.innerText = `${m.sender==='me' ? 'Bạn' : (m.sender==='bot' ? (m.botName || state.botName) : m.sender)} · ${new Date(m.time).toLocaleString()}`;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ' + (m.sender==='me' ? 'me':'');
+    bubble.innerText = m.text;
+    container.appendChild(bubble);
+    container.appendChild(meta);
+    chatEl.appendChild(container);
+  });
+
+  // typing indicator
+  if(state.isTyping){
+    const t = document.createElement('div'); t.className='msg';
+    const bubble = document.createElement('div'); bubble.className='bubble'; bubble.innerText='...';
+    t.appendChild(bubble);
+    chatEl.appendChild(t);
   }
-  candleDataPerSymbol[sym] = data;
-  return data;
+
+  // scroll bottom
+  chatEl.scrollTop = chatEl.scrollHeight;
+  statusBadge.innerText = `Status: ${state.auto ? 'auto' : 'idle'}`;
 }
 
-function setActiveSymbol(sym){
-  selectedSymbol = sym;
-  const t = tickers.find(x=>x.symbol===sym);
-  activeSym.innerText = t.symbol;
-  activeName.innerText = t.name;
-  updatePricePanel(t);
-  // update chart data
-  const data = ensureCandles(sym);
-  candleSeries.setData(data);
+// send message
+function send(text){
+  if(!text) return;
+  const m = { id: uid(), sender:'me', text, time: now() };
+  state.messages.push(m);
+  saveState();
+  render();
+  // bot reply
+  setTimeout(()=>botReply(text), 400);
 }
 
-// update price & change panel
-function updatePricePanel(t){
-  activePrice.innerText = Number(t.price).toFixed(2);
-  const pct = ((t.price - t.lastClose)/t.lastClose*100).toFixed(2);
-  activeChange.innerText = `${pct}%`;
-  activeChange.className = pct>=0 ? 'small green' : 'small red';
-  orderPrice.value = Number(t.price).toFixed(2);
-}
-
-// render tickers list
-function renderTickers(){
-  tickersDiv.innerHTML = '';
-  tickers.forEach(t=>{
-    const el = document.createElement('div');
-    el.className = 'ticker';
-    el.onclick = ()=> setActiveSymbol(t.symbol);
-    el.innerHTML = `
-      <div>
-        <div class="sym">${t.symbol}</div>
-        <div class="small" style="color:var(--muted)">${t.name}</div>
-      </div>
-      <div style="text-align:right">
-        <div class="price">${Number(t.price).toFixed(2)}</div>
-        <div class="pct ${((t.price - t.lastClose)>=0)?'green':'red'}">${((t.price - t.lastClose)/t.lastClose*100).toFixed(2)}%</div>
-      </div>
-    `;
-    if (t.symbol === selectedSymbol) el.style.background = 'rgba(255,255,255,0.02)';
-    tickersDiv.appendChild(el);
-  });
-}
-
-// simulate live prices
-let simTimers = [];
-function startSim(){
-  stopSim();
-  tickers.forEach(t=>{
-    const id = setInterval(()=>{
-      const pct = (Math.random()-0.5) * 0.6; // +/-0.3%
-      t.price = +(t.price * (1 + pct/100)).toFixed(2);
-      // update candles last bar
-      const data = ensureCandles(t.symbol);
-      const last = data[data.length-1];
-      const newClose = +(last.close * (1 + (Math.random()-0.5)/100)).toFixed(2);
-      const newHigh = Math.max(last.open, newClose) * (1 + Math.random()/200);
-      const newLow = Math.min(last.open, newClose) * (1 - Math.random()/200);
-      const newBar = { time: last.time + TF_CONFIG[currentTF], open: last.close, high: +newHigh.toFixed(2), low: +newLow.toFixed(2), close: newClose };
-      data.push(newBar);
-      if (data.length>500) data.shift();
-      // if selected, update chart and panel
-      if (t.symbol === selectedSymbol){
-        candleSeries.setData(data);
-        updatePricePanel(t);
-      }
-      renderTickers();
-    }, 1000 + Math.random()*1000);
-    simTimers.push(id);
-  });
-}
-function stopSim(){ simTimers.forEach(id=>clearInterval(id)); simTimers=[]; }
-
-// timeframe change
-function setTimeframe(tf){
-  currentTF = tf;
-  // regenerate candles for all symbols to match TF (simple approach)
-  candleDataPerSymbol = {};
-  ensureCandles(selectedSymbol);
-  candleSeries.setData(ensureCandles(selectedSymbol));
-}
-
-// order actions
-buyBtn.onclick = ()=>{ side='buy'; buyBtn.classList.add('active'); sellBtn.classList.remove('active'); };
-sellBtn.onclick = ()=>{ side='sell'; sellBtn.classList.add('active'); buyBtn.classList.remove('active'); };
-submitOrder.onclick = ()=>{
-  const qty = Number(qtyInput.value) || 0;
-  if (!qty || qty<=0) return alert('Nhập quantity hợp lệ');
-  const price = Number(orderPrice.value);
-  alert(`DEMO: ${side.toUpperCase()} ${qty} ${selectedSymbol} @ ${price.toFixed(2)}\nĐây chỉ là mô phỏng.`);
-};
-
-// admin add/remove
-addBtn.onclick = ()=>{
-  const sym = addSymInput.value.trim().toUpperCase();
-  const name = addNameInput.value.trim() || sym;
-  if (!sym) return alert('Nhập symbol');
-  if (tickers.find(x=>x.symbol===sym)) return alert('Symbol đã có');
-  const obj = { symbol: sym, name, price: +(100*(1+Math.random())).toFixed(2), lastClose: +(100*(1+Math.random())).toFixed(2) };
-  tickers.unshift(obj);
-  addSymInput.value=''; addNameInput.value='';
-  renderTickers();
-};
-removeBtn.onclick = ()=>{
-  tickers = tickers.filter(x=>x.symbol !== selectedSymbol);
-  selectedSymbol = tickers[0]?.symbol || null;
-  renderTickers();
-  if (selectedSymbol) setActiveSymbol(selectedSymbol);
-  else { document.getElementById('activeSym').innerText = ''; document.getElementById('activePrice').innerText='0.00'; }
-};
-
-// login (simple admin)
-loginBtn.onclick = ()=>{
-  const u = prompt('Username:', '');
-  if (u===null) return;
-  const p = prompt('Password:', '');
-  if (u==='admin' && p==='admin123') {
-    alert('Admin login success');
-    loginBtn.innerText = 'Admin';
-  } else {
-    alert('Login demo: any username/password logs in as user (no persistence)');
-    loginBtn.innerText = u || 'User';
+// bot reply logic
+function botReply(userText){
+  // select behavior based on replyMode
+  const mode = state.replyMode;
+  let replyText = '';
+  if(mode === 'echo'){
+    replyText = `Bạn vừa nói: "${userText}"`;
+  } else if(mode === 'random'){
+    const jokes = [
+      'Haha, nghe vui đấy 😄',
+      'Mình hiểu rồi!',
+      'Ồ, nói rõ hơn được không?',
+      'Thật không? kể mình nghe thêm đi.',
+      'Mình đang tìm thông tin...'
+    ];
+    replyText = jokes[Math.floor(Math.random()*jokes.length)];
+  } else { // smart (keyword)
+    const u = userText.toLowerCase();
+    if(u.includes('xin chào') || u.includes('hello') || u.includes('hi')) replyText = `Xin chào! Mình là ${state.botName}. Bạn có thể hỏi mình bất cứ điều gì.`;
+    else if(u.includes('tên') && u.includes('gì')) replyText = `Mình tên là ${state.botName}. Rất vui được trò chuyện!`;
+    else if(u.includes('thời tiết')) replyText = `Mình không có dữ liệu thời tiết trực tiếp trong app demo này. Bạn cần mình hướng dẫn cách lấy thời tiết từ API không?`;
+    else if(u.includes('giờ') || u.includes('time')) replyText = `Bây giờ là ${new Date().toLocaleString()}`;
+    else if(u.includes('cách') && u.includes('làm')) replyText = `Bạn đang cần hướng dẫn cụ thể chỗ nào hơn? Mô tả ngắn giúp mình nhé.`;
+    else replyText = `Mình nghe bạn: "${userText}". Bạn muốn mình trả lời chi tiết hay gợi ý?`;
   }
+
+  // simulate typing
+  state.isTyping = true; render();
+  const typingDelay = 600 + Math.random()*1200;
+  setTimeout(()=>{
+    state.isTyping = false;
+    const botMsg = { id: uid(), sender:'bot', botName: state.botName, text: replyText, time: now() };
+    state.messages.push(botMsg);
+    saveState();
+    render();
+  }, typingDelay);
+}
+
+// auto-generate conversation (bot initiates and replies)
+let autoTimer = null;
+function startAuto(){
+  stopAuto();
+  const sec = Math.max(2, Number(autoInterval.value) || 8);
+  state.auto = true;
+  state.intervalSec = sec;
+  function tick(){
+    // bot or user message alternation simulation
+    const rand = Math.random();
+    if(rand < 0.4){
+      // bot sends a prompt (initiates)
+      const prompts = [
+        'Chào bạn, hôm nay bạn thế nào?',
+        'Bạn thích chủ đề gì hôm nay?',
+        'Bạn đang cần trợ giúp về gì?',
+        'Mình có vài mẹo hay muốn chia sẻ...'
+      ];
+      const txt = prompts[Math.floor(Math.random()*prompts.length)];
+      state.isTyping = true; render();
+      setTimeout(()=> {
+        state.isTyping = false;
+        state.messages.push({ id: uid(), sender:'bot', botName: state.botName, text: txt, time: now() });
+        saveState(); render();
+      }, 800 + Math.random()*800);
+    } else {
+      // simulated user reply (bot will then auto-reply)
+      const replies = [
+        'OK, cho mình biết thêm.',
+        'Nghe hay đó!',
+        'Bạn có thể giải thích rõ hơn?',
+        'Mình đồng ý.',
+        'Thử hỏi một điều khác nhé.'
+      ];
+      const txt = replies[Math.floor(Math.random()*replies.length)];
+      state.messages.push({ id: uid(), sender:'me', text: txt, time: now() });
+      saveState(); render();
+      // bot auto-reply shortly
+      setTimeout(()=> botReply(txt), 600 + Math.random()*600);
+    }
+  }
+  tick(); // immediate
+  autoTimer = setInterval(tick, sec*1000);
+  render();
+}
+function stopAuto(){
+  if(autoTimer) clearInterval(autoTimer);
+  autoTimer = null;
+  state.auto = false;
+  render();
+}
+
+// UI wiring
+sendBtn.onclick = ()=>{ send(inputMsg.value.trim()); inputMsg.value=''; inputMsg.focus(); };
+inputMsg.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); sendBtn.click(); } });
+clearBtn.onclick = ()=>{ if(confirm('Xóa toàn bộ cuộc trò chuyện?')){ state.messages=[]; saveState(); render(); } };
+autoToggle.onchange = (e)=>{ if(e.target.checked) startAuto(); else stopAuto(); };
+autoInterval.onchange = ()=>{ if(state.auto) startAuto(); };
+replyMode.onchange = ()=>{ state.replyMode = replyMode.value; };
+botNameInput.onchange = ()=>{ state.botName = botNameInput.value.trim() || 'Thảo'; };
+startConvBtn.onclick = ()=>{
+  const starter = [
+    `Xin chào! Mình là ${state.botName}. Bạn cần giúp gì?`,
+    `Chào bạn, mình có thể hỗ trợ những gì hôm nay?`
+  ];
+  state.messages.push({ id: uid(), sender:'bot', botName: state.botName, text: starter[Math.floor(Math.random()*starter.length)], time: now() });
+  saveState(); render();
 };
 
-// init everything
-initChart();
-renderTickers();
-setActiveSymbol(selectedSymbol);
-startSim();
+// export/import
+exportBtn.onclick = ()=>{
+  exportBox.value = JSON.stringify(state.messages, null, 2);
+  alert('Đã tạo JSON trong ô Export. Bạn có thể sao chép để lưu.');
+};
+importBtn.onclick = ()=>{
+  const raw = prompt('Dán JSON cuộc trò chuyện để import:', '');
+  if(!raw) return;
+  try{
+    const arr = JSON.parse(raw);
+    if(Array.isArray(arr)){ state.messages = arr; saveState(); render(); alert('Import OK'); }
+    else alert('JSON không đúng định dạng (mảng)');
+  }catch(e){ alert('JSON lỗi: '+e.message); }
+};
 
-// ensure chart updates when symbol switched
-// also update orderPrice every second from selected ticker
-setInterval(()=>{
-  const t = tickers.find(x=>x.symbol===selectedSymbol);
-  if (t) {
-    updatePricePanel(t);
-    orderPrice.value = Number(t.price).toFixed(2);
-  }
-}, 1000);
+// load on start
+loadState();
+render();
+
+// populate controls initial values
+autoInterval.value = state.intervalSec;
+replyMode.value = state.replyMode;
+botNameInput.value = state.botName;
+
+// helpful housekeeping: if there are no messages, add a greeting
+if(state.messages.length === 0){
+  state.messages.push({ id: uid(), sender:'bot', botName: state.botName, text: `Xin chào! Mình là ${state.botName}. Đây là demo chat tự động.`, time: now() });
+  saveState();
+  render();
+}
+
+// cleanup on page hide
+window.addEventListener('beforeunload', ()=> saveState());
 
 </script>
 </body>
