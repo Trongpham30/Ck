@@ -1,445 +1,373 @@
-<!--
-Advanced Stock Game - single-file web app (index.html)
-Features added/updated from previous version:
- - Admin account with username/password (secure-ish hashing via SubtleCrypto SHA-256 + random salt stored in localStorage)
- - User registration/login with password (hashed), email-like field optional, stronger validation
- - Admin panel requires admin login and is integrated as an account (can promote/demote users to admin)
- - Matching engine: full orderbook, price-time priority, supports Market, Limit orders and Time-in-Force: GTC, IOC, FOK
- - Trailing Stop orders (percentage-based or absolute): tracks best price and triggers into market/limit when touched
- - Candle aggregation selectable: 1s, 5s, 10s, 15s, 30s, 60s. Candles are built from simulation ticks.
- - Orders display with live counts; pending orders update when placed and during execution; number animations included.
- - Admin management: adjust user cash, force-fill or cancel orders, add/remove tickers, seed users.
- - UI improved with Tailwind, clearer panels and responsive layout.
-
-How to use:
- - Upload this index.html as the website URL to AppsGeyser when creating a Website/WebView app.
- - Admin default account: username `admin`, password `admin123` (change immediately in Admin -> Settings).
- - All data stored in localStorage under key `asg-db`. To reset, Admin -> Reset.
-
-Note: This is a front-end-only simulation suitable for demo/play. Do not use for real trading or real money.
--->
-
 <!doctype html>
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Advanced Stock Game - AppsGeyser</title>
+  <title>Game Tài Xỉu - Bầu Cua - Chẵn Lẻ (Demo)</title>
+  <!-- Tailwind CDN for quick styling (works in AppsGeyser webview) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { background: linear-gradient(180deg,#071024,#00040a); color: #e6eef8; }
-    .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(6px); }
-    canvas { width: 100%; height: 260px; }
-    .small-muted { color: #9aa6b2; font-size: 0.85rem }
-    .pill { padding: .15rem .5rem; border-radius: .375rem; }
+  <style>/* small helpers */
+    .card{background:linear-gradient(180deg,#ffffff,#f8fafc);}
   </style>
 </head>
-<body class="min-h-screen p-4">
-  <div class="max-w-6xl mx-auto">
+<body class="bg-slate-100 text-slate-800">
+  <div class="max-w-4xl mx-auto p-4">
     <header class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-semibold">Advanced Stock Game</h1>
-      <div id="top-controls" class="flex items-center gap-3"></div>
+      <h1 class="text-2xl font-bold">Tài Xỉu • Bầu Cua • Chẵn Lẻ — Demo</h1>
+      <div id="user-info" class="text-sm"></div>
     </header>
 
-    <main class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-      <section class="lg:col-span-3 glass p-4 rounded shadow">
-        <div class="flex justify-between items-start gap-4">
-          <div class="flex-1">
-            <div class="flex items-center justify-between mb-2">
-              <div>
-                <select id="ticker-select" class="rounded px-2 py-1 bg-slate-900 text-white"></select>
-                <span id="ticker-name" class="ml-2 small-muted"></span>
-              </div>
-              <div class="flex items-center gap-2">
-                <label class="small-muted">Candle</label>
-                <select id="candle-interval" class="rounded px-2 py-1 bg-slate-900 text-white">
-                  <option value="1000">1s</option>
-                  <option value="5000">5s</option>
-                  <option value="10000">10s</option>
-                  <option value="15000">15s</option>
-                  <option value="30000">30s</option>
-                  <option value="60000">1m</option>
-                </select>
-                <button id="open-admin" class="px-2 py-1 rounded bg-yellow-500 text-black">Admin</button>
-              </div>
-            </div>
-
-            <canvas id="chart"></canvas>
-
-            <div class="mt-2 flex items-center gap-4">
-              <div class="text-sm">Price: <span id="cur-price" class="font-semibold">-</span></div>
-              <div class="text-sm">Change: <span id="cur-change">-</span></div>
-              <div class="text-sm">Vol: <span id="cur-vol">-</span></div>
-              <div class="text-sm">Last: <span id="last-trade">-</span></div>
-            </div>
+    <main class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Auth / Account -->
+      <section class="card p-4 rounded-lg shadow">
+        <h2 class="font-semibold mb-2">Đăng nhập / Đăng ký</h2>
+        <form id="auth-form" class="space-y-2">
+          <input id="username" placeholder="Tên đăng nhập" class="w-full p-2 border rounded" required />
+          <input id="password" type="password" placeholder="Mật khẩu" class="w-full p-2 border rounded" required />
+          <div class="flex gap-2">
+            <button id="login-btn" type="button" class="px-3 py-2 bg-blue-600 text-white rounded">Đăng nhập</button>
+            <button id="register-btn" type="button" class="px-3 py-2 bg-green-600 text-white rounded">Đăng ký</button>
           </div>
+          <p class="text-xs text-slate-500">Demo: admin/admin123 (hãy đổi ngay trong Admin)</p>
+        </form>
 
-          <div class="w-80">
-            <div class="p-3 bg-slate-900 rounded">
-              <h3 class="font-semibold">Place Order</h3>
-              <div class="mt-2 grid grid-cols-2 gap-2">
-                <select id="ord-side" class="col-span-1 px-2 py-1 rounded bg-slate-800 text-white">
-                  <option value="buy">Buy</option>
-                  <option value="sell">Sell</option>
-                </select>
-                <select id="ord-type" class="col-span-1 px-2 py-1 rounded bg-slate-800 text-white">
-                  <option value="market">Market</option>
-                  <option value="limit">Limit</option>
-                  <option value="stop">Stop</option>
-                  <option value="trailing_stop">Trailing Stop</option>
-                </select>
-                <input id="ord-qty" type="number" min="1" value="1" class="px-2 py-1 rounded bg-slate-800 text-white" />
-                <input id="ord-price" type="number" step="0.01" placeholder="Price (for Limit)" class="px-2 py-1 rounded bg-slate-800 text-white" />
-                <select id="tif" class="col-span-2 px-2 py-1 rounded bg-slate-800 text-white">
-                  <option value="GTC">GTC</option>
-                  <option value="IOC">IOC</option>
-                  <option value="FOK">FOK</option>
-                </select>
-                <input id="trailing-val" placeholder="Trailing % or abs" class="col-span-2 px-2 py-1 rounded bg-slate-800 text-white" />
-                <button id="place-order" class="col-span-2 mt-2 px-3 py-1 rounded bg-indigo-600">Place Order</button>
-              </div>
-            </div>
-
-            <div class="mt-3 p-3 bg-slate-900 rounded">
-              <h4 class="font-semibold">Your Quick Panel</h4>
-              <div id="quick-panel" class="mt-2 small-muted">Login to trade</div>
-            </div>
-          </div>
+        <hr class="my-3" />
+        <div class="text-sm">
+          <strong>Số dư:</strong> <span id="balance">-</span><br>
+          <strong>Lịch sử:</strong>
+          <div id="history" class="h-32 overflow-auto text-xs mt-2 p-2 bg-white border rounded"></div>
         </div>
-
-        <hr class="my-3 border-slate-700" />
-
-        <div class="grid grid-cols-3 gap-4">
-          <div class="col-span-1 bg-slate-900 p-2 rounded">
-            <h4 class="font-semibold">Orderbook</h4>
-            <div id="orderbook" class="text-sm mt-2 h-56 overflow-auto"></div>
-          </div>
-          <div class="col-span-1 bg-slate-900 p-2 rounded">
-            <h4 class="font-semibold">Trades</h4>
-            <div id="trades" class="text-sm mt-2 h-56 overflow-auto"></div>
-          </div>
-          <div class="col-span-1 bg-slate-900 p-2 rounded">
-            <h4 class="font-semibold">Market Stats</h4>
-            <div id="stats" class="text-sm mt-2"></div>
-          </div>
-        </div>
-
       </section>
 
-      <aside class="glass p-4 rounded shadow">
-        <div id="auth-area"></div>
-        <hr class="my-3 border-slate-700" />
-        <div>
-          <h4 class="font-semibold">Portfolio</h4>
-          <div id="portfolio" class="text-sm mt-2"></div>
+      <!-- Game selection -->
+      <section class="card p-4 rounded-lg shadow md:col-span-2">
+        <h2 class="font-semibold mb-2">Chọn trò chơi & đặt cược</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="p-3 bg-white border rounded">
+            <h3 class="font-medium">Tài / Xỉu</h3>
+            <p class="text-xs text-slate-500">Tài: tổng 11-17, Xỉu: 4-10. (Quy tắc demo: ba viên giống nhau -> cược tài/xỉu thua)</p>
+            <input id="tx-amount" type="number" min="100" step="100" placeholder="Số tiền" class="w-full p-2 border rounded my-2" />
+            <div class="flex gap-2">
+              <button data-game="taixiu" data-choice="tai" class="bet-btn px-3 py-2 bg-indigo-600 text-white rounded">Chọn Tài</button>
+              <button data-game="taixiu" data-choice="xiu" class="bet-btn px-3 py-2 bg-indigo-400 text-white rounded">Chọn Xỉu</button>
+            </div>
+          </div>
+
+          <div class="p-3 bg-white border rounded">
+            <h3 class="font-medium">Bầu Cua</h3>
+            <p class="text-xs text-slate-500">Chọn 1 trong 6 mặt: Bầu, Cua, Tôm, Cá, Gà, Nai</p>
+            <select id="bc-face" class="w-full p-2 border rounded my-2">
+              <option value="bau">Bầu</option>
+              <option value="cua">Cua</option>
+              <option value="tom">Tôm</option>
+              <option value="ca">Cá</option>
+              <option value="ga">Gà</option>
+              <option value="nai">Nai</option>
+            </select>
+            <input id="bc-amount" type="number" min="100" step="100" placeholder="Số tiền" class="w-full p-2 border rounded my-2" />
+            <button data-game="baucua" class="bet-btn w-full px-3 py-2 bg-rose-600 text-white rounded">Đặt cược</button>
+          </div>
+
+          <div class="p-3 bg-white border rounded">
+            <h3 class="font-medium">Chẵn / Lẻ</h3>
+            <p class="text-xs text-slate-500">Dựa trên tổng ba xúc xắc</p>
+            <input id="cl-amount" type="number" min="100" step="100" placeholder="Số tiền" class="w-full p-2 border rounded my-2" />
+            <div class="flex gap-2">
+              <button data-game="chanle" data-choice="chan" class="bet-btn px-3 py-2 bg-emerald-600 text-white rounded">Chẵn</button>
+              <button data-game="chanle" data-choice="le" class="bet-btn px-3 py-2 bg-amber-600 text-white rounded">Lẻ</button>
+            </div>
+          </div>
         </div>
-        <hr class="my-3 border-slate-700" />
-        <div>
-          <h4 class="font-semibold">Leaderboard</h4>
-          <div id="leaderboard" class="text-sm mt-2"></div>
+
+        <hr class="my-3" />
+        <div class="flex items-center gap-3">
+          <button id="spin-btn" class="px-4 py-2 bg-slate-900 text-white rounded">Quay xúc xắc (Spin)</button>
+          <div id="result-area" class="text-sm"></div>
         </div>
-      </aside>
+
+        <div class="mt-3 p-3 bg-white border rounded text-sm" id="last-round">Kết quả: —</div>
+      </section>
+
+      <!-- Admin panel (hidden until admin login) -->
+      <section id="admin-panel" class="card p-4 rounded-lg shadow hidden md:col-span-3">
+        <h2 class="font-semibold mb-2">Admin — Quản lý</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="p-3 bg-white border rounded">
+            <h3 class="font-medium">Người chơi</h3>
+            <div id="user-list" class="text-xs h-48 overflow-auto mt-2"></div>
+          </div>
+          <div class="p-3 bg-white border rounded">
+            <h3 class="font-medium">Hành động</h3>
+            <input id="admin-target" placeholder="username" class="w-full p-2 border rounded my-2" />
+            <input id="admin-amount" type="number" placeholder="Số tiền (+/-)" class="w-full p-2 border rounded my-2" />
+            <button id="admin-adjust" class="w-full px-3 py-2 bg-yellow-600 text-white rounded">Điều chỉnh số dư</button>
+            <hr class="my-2" />
+            <button id="admin-reset" class="w-full px-3 py-2 bg-red-600 text-white rounded">Reset dữ liệu (demo)</button>
+          </div>
+          <div class="p-3 bg-white border rounded">
+            <h3 class="font-medium">Cấu hình</h3>
+            <label class="text-xs">Admin user:</label>
+            <input id="admin-user" class="w-full p-2 border rounded my-2" />
+            <label class="text-xs">Admin pass (mật khẩu plaintext để demo)</label>
+            <input id="admin-pass" class="w-full p-2 border rounded my-2" />
+            <button id="admin-save-creds" class="w-full px-3 py-2 bg-sky-600 text-white rounded">Lưu</button>
+          </div>
+        </div>
+      </section>
+
     </main>
 
-    <!-- Admin modal -->
-    <div id="admin-modal" class="fixed inset-0 hidden items-center justify-center bg-black/60 p-4">
-      <div class="bg-slate-800 p-4 rounded w-full max-w-3xl">
-        <div class="flex justify-between items-center mb-3">
-          <h2 class="text-lg font-medium">Admin Panel</h2>
-          <button id="admin-close" class="px-2 py-1 rounded bg-red-600">Close</button>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <h4 class="font-semibold">Tickers</h4>
-            <div class="mt-2 flex gap-2">
-              <input id="new-code" placeholder="CODE" class="px-2 py-1 rounded bg-slate-900" />
-              <input id="new-name" placeholder="Name" class="px-2 py-1 rounded bg-slate-900" />
-              <input id="new-price" type="number" placeholder="Start" class="px-2 py-1 rounded bg-slate-900" />
-              <button id="add-ticker" class="px-2 py-1 rounded bg-green-600">Add</button>
-            </div>
-            <div id="ticker-list" class="mt-2 text-sm bg-slate-900 p-2 rounded h-48 overflow-auto"></div>
-          </div>
-          <div>
-            <h4 class="font-semibold">Users</h4>
-            <div id="user-list" class="mt-2 text-sm bg-slate-900 p-2 rounded h-48 overflow-auto"></div>
-            <div class="mt-3">
-              <button id="seed-users" class="px-2 py-1 rounded bg-indigo-600">Seed Sample Users</button>
-              <button id="reset-db" class="px-2 py-1 rounded bg-red-600">Reset DB</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Auth modal -->
-    <div id="auth-modal" class="fixed inset-0 hidden items-center justify-center bg-black/60 p-4">
-      <div class="bg-slate-800 p-4 rounded w-full max-w-md">
-        <h3 class="text-lg font-medium mb-2">Login / Register</h3>
-        <div class="grid gap-2">
-          <input id="reg-username" placeholder="Username" class="px-2 py-1 rounded bg-slate-900" />
-          <input id="reg-password" placeholder="Password" type="password" class="px-2 py-1 rounded bg-slate-900" />
-          <input id="reg-password2" placeholder="Confirm Password" type="password" class="px-2 py-1 rounded bg-slate-900" />
-          <div class="flex gap-2">
-            <button id="btn-register" class="px-2 py-1 rounded bg-green-600">Register</button>
-            <button id="btn-login" class="px-2 py-1 rounded bg-indigo-600">Login</button>
-            <button id="btn-guest" class="px-2 py-1 rounded bg-gray-600">Guest</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    <footer class="mt-6 text-xs text-slate-500">Lưu ý: Đây là bản demo chạy hoàn toàn phía client (không dùng tiền thật). Để đưa lên AppsGeyser tải file này làm WebView hoặc host trên web có HTTPS rồi nhập URL vào AppsGeyser.</footer>
   </div>
 
 <script>
-/* Storage and helpers */
-const LSKEY = 'asg-db';
-function loadDB(){ try{ return JSON.parse(localStorage.getItem(LSKEY)||'null') }catch(e){return null} }
-function saveDB(db){ localStorage.setItem(LSKEY, JSON.stringify(db)) }
+// ---- Simple client-side "server" using localStorage (DEMO ONLY) ----
+const DB = {
+  key: 'txbc_demo_v1',
+  load(){
+    const raw = localStorage.getItem(this.key);
+    if(!raw){
+      const init = {
+        users: { 'admin': { username:'admin', salt: '', passHash: '', balance: 1000000, isAdmin:true } },
+        rounds: [],
+        config:{ adminUser:'admin', adminPass:'admin123' }
+      };
+      localStorage.setItem(this.key, JSON.stringify(init));
+      return init;
+    }
+    return JSON.parse(raw);
+  },
+  save(state){ localStorage.setItem(this.key, JSON.stringify(state)); }
+}
+let STATE = DB.load();
 
-function ensureDB(){
-  let db = loadDB();
-  if(!db){
-    db = {
-      tickers: {
-        BTC: makeTicker('BTC','BitCoin-like',100),
-        ABC: makeTicker('ABC','Alpha Corp',50)
-      },
-      users: {},
-      orders: [], // live orderbook: objects {id, user, side, qty, remaining, type(limit/market/stop/trailing_stop), price, stopPrice, trailing, tif, created, status}
-      trades: [],
-      settings: { candleInterval:1000, simTick:1000 }
-    };
-    // create default admin
-    (async ()=>{
-      const {salt, hash} = await hashPassword('admin123');
-      db.users['admin'] = { username:'admin', hash, salt, isAdmin:true, cash:100000, holdings:{}, created:Date.now() };
-      saveDB(db);
-    })();
+// On first run, if admin pass not set, store hashed admin123
+(async function ensureAdmin(){
+  if(!STATE.users.admin.passHash || STATE.users.admin.passHash===''){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const passHash = await hashPassword('admin123', salt);
+    STATE.users.admin.salt = ab2hex(salt);
+    STATE.users.admin.passHash = passHash;
+    STATE.users.admin.isAdmin = true;
+    DB.save(STATE);
+    STATE.config.adminPass = 'admin123';
   }
-  return db;
+})();
+
+// --- utils ---
+function ab2hex(buf){ return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function hex2ab(hex){ const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(h=>parseInt(h,16))); return bytes.buffer; }
+async function hashPassword(pass, salt){
+  // PBKDF2 with SHA-256, 100k iterations (client-side; OK for demo). In prod do server-side!
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(pass),'PBKDF2',false,['deriveBits']);
+  const derived = await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'}, key, 256);
+  return ab2hex(derived);
 }
 
-function makeTicker(code,name,price){ return { code, name, lastPrice:price, candles:[], bids:[], asks:[] } }
+function cryptoRandInt(max){ // secure random int [0,max)
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  return array[0] % max;
+}
 
-let DB = ensureDB();
+function saveState(){ DB.save(STATE); }
+
+// --- Auth ---
 let currentUser = null;
-let selectedTicker = Object.keys(DB.tickers)[0];
-
-/* crypto hashing for passwords */
-async function genSalt(){ const a = crypto.getRandomValues(new Uint8Array(16)); return btoa(String.fromCharCode(...a)); }
-async function hashPassword(pw, salt=null){ salt = salt || await genSalt(); const enc = new TextEncoder(); const data = enc.encode(pw + salt); const digest = await crypto.subtle.digest('SHA-256', data); const hash = btoa(String.fromCharCode(...new Uint8Array(digest))); return { salt, hash }; }
-
-async function verifyPassword(pw, salt, hash){ const h = await hashPassword(pw, salt); return h.hash === hash }
-
-/* UI elems */
-const tickerSelect = document.getElementById('ticker-select');
-const candleInterval = document.getElementById('candle-interval');
-const chart = document.getElementById('chart'); const ctx = chart.getContext('2d');
-
-function renderTop(){ const el = document.getElementById('top-controls'); el.innerHTML=''; if(!currentUser){ const btn=document.createElement('button'); btn.textContent='Login'; btn.className='px-3 py-1 rounded bg-green-600'; btn.onclick=openAuth; el.appendChild(btn);} else { const u=DB.users[currentUser]; const div=document.createElement('div'); div.className='flex items-center gap-2'; const img=document.createElement('div'); img.className='w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center'; img.textContent=u.username[0]; div.appendChild(img); const nm=document.createElement('div'); nm.textContent=u.username; div.appendChild(nm); const logout=document.createElement('button'); logout.textContent='Logout'; logout.className='px-2 py-1 rounded bg-red-600'; logout.onclick=()=>{currentUser=null; renderTop(); renderQuickPanel();}; div.appendChild(logout); el.appendChild(div);} }
-
-function renderAuthArea(){ const a=document.getElementById('auth-area'); a.innerHTML=''; if(!currentUser){ const btn=document.createElement('button'); btn.className='w-full px-3 py-2 rounded bg-indigo-600'; btn.textContent='Login / Create'; btn.onclick=openAuth; a.appendChild(btn);} else { const u=DB.users[currentUser]; a.innerHTML = `<div class="flex items-center gap-3"><div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center">${u.username[0]}</div><div><div class="font-semibold">${u.username}</div><div class="small-muted">$${u.cash.toFixed(2)}</div></div></div>` } }
-
-function renderTickerSelect(){ tickerSelect.innerHTML=''; Object.values(DB.tickers).forEach(t=>{ const o=document.createElement('option'); o.value=t.code; o.textContent = t.code + ' — ' + t.name; tickerSelect.appendChild(o); }); tickerSelect.value = selectedTicker; document.getElementById('ticker-name').textContent = DB.tickers[selectedTicker].name; }
-
-/* orderbook & matching engine */
-function orderId(){ return 'o'+Math.random().toString(36).slice(2,9) }
-
-function placeOrderUI(){ if(!currentUser){ alert('Login to place orders'); return }
-  const side = document.getElementById('ord-side').value;
-  const type = document.getElementById('ord-type').value;
-  const qty = Math.max(1, parseFloat(document.getElementById('ord-qty').value)||1);
-  const price = parseFloat(document.getElementById('ord-price').value) || null;
-  const tif = document.getElementById('tif').value;
-  const trailingRaw = document.getElementById('trailing-val').value.trim();
-  let trailing = null;
-  if(trailingRaw){ if(trailingRaw.endsWith('%')) trailing = { pct: parseFloat(trailingRaw)/100 } else trailing = { abs: parseFloat(trailingRaw) } }
-  const ord = { id: orderId(), user: currentUser, ticker: selectedTicker, side, qty, remaining: qty, type, price, tif, trailing, stopPrice: (type==='stop'?price:null), created: Date.now(), status:'open', lastUpdate: Date.now() };
-  // Validation: funds/holdings
-  const u = DB.users[currentUser];
-  if(side==='buy' && (type==='market' || type==='limit') ){ const est = (price||DB.tickers[selectedTicker].lastPrice||0) * qty; if(u.cash < est*1.1){ if(!confirm('Insufficient cash for full size; still place?')) return } }
-  DB.orders.push(ord); saveDB(DB); renderOrderbook(); renderQuickPanel();
+async function register(username, password){
+  username = username.trim().toLowerCase();
+  if(STATE.users[username]) throw 'Tên người dùng đã tồn tại';
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const passHash = await hashPassword(password, salt);
+  STATE.users[username] = { username, salt: ab2hex(salt), passHash, balance: 10000, isAdmin:false };
+  saveState();
 }
-
-document.getElementById('place-order').addEventListener('click', placeOrderUI);
-
-function sortBook(){ // for matching: highest bids first, lowest asks first
-  DB.orders = DB.orders.filter(o=>o.status==='open');
+async function login(username, password){
+  username = username.trim().toLowerCase();
+  const u = STATE.users[username];
+  if(!u) throw 'Người dùng không tồn tại';
+  const salt = hex2ab(u.salt);
+  const passHash = await hashPassword(password, salt);
+  if(passHash !== u.passHash) throw 'Mật khẩu sai';
+  currentUser = u;
+  renderUser();
 }
+function logout(){ currentUser = null; renderUser(); }
 
-function matchEngineTick(){
-  // Basic simulated market movement and candle building
-  const T = DB.tickers[selectedTicker];
-  // Simulate small price delta if no trades
-  if(DB.trades.length===0){ T.lastPrice = T.lastPrice * (1 + (Math.random()-0.5)*0.002); }
+// --- UI wiring ---
+const userInfoEl = document.getElementById('user-info');
+const balanceEl = document.getElementById('balance');
+const historyEl = document.getElementById('history');
+const lastRoundEl = document.getElementById('last-round');
+const adminPanel = document.getElementById('admin-panel');
 
-  // First process trailing stops: update their stopPrice based on favorable movement
-  DB.orders.forEach(o=>{
-    if(o.type==='trailing_stop' && o.status==='open'){
-      if(!o._trailRef) o._trailRef = { best: T.lastPrice };
-      if(o.side==='sell'){
-        // best is highest price seen since order
-        o._trailRef.best = Math.max(o._trailRef.best, T.lastPrice);
-        const trigger = o._trailRef.best - (o.trailing?.abs || (o._trailRef.best * (o.trailing?.pct||0)));
-        if(T.lastPrice <= trigger){ // trigger to market sell
-          o.type = 'market'; o.price = null; o.triggered=true; }
-      } else {
-        // buy trailing stop (less common) - trigger when price >= best + distance
-        o._trailRef.best = Math.min(o._trailRef.best, T.lastPrice);
-        const trigger = o._trailRef.best + (o.trailing?.abs || (o._trailRef.best * (o.trailing?.pct||0)));
-        if(T.lastPrice >= trigger){ o.type='market'; o.price=null; o.triggered=true; }
-      }
-    }
-    if(o.type==='stop' && o.status==='open' && o.stopPrice!=null){
-      if(o.side==='buy' && T.lastPrice >= o.stopPrice){ o.type='market'; o.triggered=true }
-      if(o.side==='sell' && T.lastPrice <= o.stopPrice){ o.type='market'; o.triggered=true }
-    }
-  });
-
-  // Separate books for limit orders
-  let bids = DB.orders.filter(o=>o.ticker===selectedTicker && o.side==='buy' && (o.type==='limit' || o.type==='market')).slice().sort((a,b)=>{
-    if(a.type==='market' && b.type!=='market') return -1; if(b.type==='market' && a.type!=='market') return 1;
-    if(a.price!==b.price) return b.price - a.price; return a.created - b.created;
-  });
-  let asks = DB.orders.filter(o=>o.ticker===selectedTicker && o.side==='sell' && (o.type==='limit' || o.type==='market')).slice().sort((a,b)=>{
-    if(a.type==='market' && b.type!=='market') return -1; if(b.type==='market' && a.type!=='market') return 1;
-    if(a.price!==b.price) return a.price - b.price; return a.created - b.created;
-  });
-
-  // matching loop
-  for(let i=0;i< Math.max(bids.length, asks.length); i++){
-    const bid = bids[i];
-    for(let j=0;j<asks.length;j++){
-      const ask = asks[j];
-      if(!bid || !ask) continue;
-      // determine match price
-      const bidPrice = bid.type==='market' ? Infinity : bid.price;
-      const askPrice = ask.type==='market' ? 0 : ask.price;
-      // match if bidPrice >= askPrice
-      if(bidPrice >= askPrice){
-        const tradePrice = (bid.type==='market' && ask.type!=='market') ? ask.price : (ask.type==='market' && bid.type!=='market') ? bid.price : ((bid.price+ask.price)/2);
-        const qty = Math.min(bid.remaining, ask.remaining);
-        // handle FOK/IOC
-        if(bid.tif==='FOK' && bid.qty>bid.remaining){ /* implies it already partially filled */ }
-        // execute fill
-        executeTrade(bid, ask, qty, tradePrice);
-        // update arrays
-        if(bid.remaining<=0) bids.splice(i,1);
-        if(ask.remaining<=0) { asks.splice(j,1); j--; }
-        // bookkeeping
-      }
-    }
-  }
-
-  // Post-process: handle IOC and FOK cancellations
-  DB.orders.forEach(o=>{
-    if(o.status==='open'){
-      if(o.tif==='IOC' && !o._justFilled){ // IOC: cancel any remaining immediately after matching attempt
-        // We implement by checking if created before this tick and still has remaining
-        if(Date.now() - o.created > 50) { o.status='cancelled' }
-      }
-      if(o.tif==='FOK' && o._partialFill){ o.status='cancelled' }
-    }
-    delete o._justFilled; delete o._partialFill;
-  });
-
-  saveDB(DB); renderOrderbook(); renderTrades(); renderMarketInfo(); renderPortfolio(); renderLeaderboard(); renderChart();
-}
-
-function executeTrade(bid, ask, qty, price){
-  // adjust buyer
-  const buyer = DB.users[bid.user];
-  const seller = DB.users[ask.user];
-  const cost = qty * price;
-  // buyer pays
-  if(buyer){ if(buyer.cash + 1e-8 >= cost){ buyer.cash -= cost; buyer.holdings[bid.ticker] = (buyer.holdings[bid.ticker]||0)+qty; } else { /* insufficient: skip fill */ return } }
-  if(seller){ const have = seller.holdings[ask.ticker]||0; if(have>=qty){ seller.holdings[ask.ticker] -= qty; seller.cash += cost; } else { /* seller lacks shares: skip */ return } }
-  bid.remaining -= qty; ask.remaining -= qty;
-  if(bid.remaining<=0) bid.status='filled'; else { bid._partialFill=true }
-  if(ask.remaining<=0) ask.status='filled'; else { ask._partialFill=true }
-  bid._justFilled = true; ask._justFilled = true;
-  DB.trades.unshift({ time: Date.now(), ticker: bid.ticker, qty, price, buyer: bid.user, seller: ask.user });
-  DB.tickers[bid.ticker].lastPrice = price;
-}
-
-/* Chart building */
-function buildCandle(tickerCode){ const t = DB.tickers[tickerCode]; const interval = parseInt(candleInterval.value);
-  const now = Date.now();
-  const lastCandle = t.candles[t.candles.length-1];
-  const price = t.lastPrice;
-  if(!lastCandle || Math.floor(lastCandle.t/interval) !== Math.floor(now/interval)){
-    // start new candle
-    const c = { t: now, open: price, high: price, low: price, close: price, vol:0 };
-    t.candles.push(c);
+function renderUser(){
+  if(currentUser){
+    userInfoEl.innerHTML = `${currentUser.username} • <a href='#' id='logout'>Đăng xuất</a>`;
+    balanceEl.textContent = new Intl.NumberFormat().format(currentUser.balance) + ' VNĐ (ảo)';
+    document.getElementById('logout').onclick = (e)=>{ e.preventDefault(); logout(); };
+    // admin panel show
+    if(currentUser.isAdmin) adminPanel.classList.remove('hidden'); else adminPanel.classList.add('hidden');
   } else {
-    lastCandle.close = price; lastCandle.high = Math.max(lastCandle.high, price); lastCandle.low = Math.min(lastCandle.low, price);
+    userInfoEl.innerHTML = '';
+    balanceEl.textContent = '-';
+    adminPanel.classList.add('hidden');
   }
+  // history
+  const rounds = (STATE.rounds||[]).slice().reverse();
+  historyEl.innerHTML = rounds.slice(0,40).map(r=>`<div>${r.time} — ${r.user} — ${r.msg}</div>`).join('');
+  renderUserList();
 }
 
-function renderChart(){ const can = chart; const w = can.width = can.clientWidth*devicePixelRatio; const h = can.height = can.clientHeight*devicePixelRatio; ctx.clearRect(0,0,w,h);
-  const t = DB.tickers[selectedTicker]; if(!t) return; const candles = t.candles.slice(-80); if(!candles.length) return;
-  const prices = candles.flatMap(c=>[c.high,c.low]); const max = Math.max(...prices); const min = Math.min(...prices); const pad=(max-min)*0.1||1; const xStep = w/candles.length;
-  candles.forEach((c,i)=>{ const x = i*xStep + xStep/2; const yOpen = h - ((c.open-min+pad)/(max-min+2*pad)*h); const yClose = h - ((c.close-min+pad)/(max-min+2*pad)*h); const yHigh = h - ((c.high-min+pad)/(max-min+2*pad)*h); const yLow = h - ((c.low-min+pad)/(max-min+2*pad)*h); ctx.beginPath(); ctx.moveTo(x,yHigh); ctx.lineTo(x,yLow); ctx.lineWidth = 1*devicePixelRatio; ctx.strokeStyle='#6b7280'; ctx.stroke(); const bodyTop=Math.min(yOpen,yClose); const bodyH=Math.max(2,Math.abs(yOpen-yClose)); ctx.fillStyle = c.close>=c.open? '#06b6d4':'#ef4444'; ctx.fillRect(x-xStep*0.25, bodyTop, xStep*0.5, bodyH); }) }
+function renderUserList(){
+  const ul = document.getElementById('user-list');
+  ul.innerHTML = Object.values(STATE.users).map(u=>`<div class='p-1 border-b'>${u.username} — ${new Intl.NumberFormat().format(u.balance)}</div>`).join('');
+}
 
-/* UI rendering for orderbook, trades */
-function renderOrderbook(){ const out = document.getElementById('orderbook'); out.innerHTML=''; const bids = DB.orders.filter(o=>o.ticker===selectedTicker && o.side==='buy' && o.status==='open').sort((a,b)=> (b.price||Infinity)-(a.price||Infinity) || a.created-b.created ); const asks = DB.orders.filter(o=>o.ticker===selectedTicker && o.side==='sell' && o.status==='open').sort((a,b)=> (a.price||0)-(b.price||0) || a.created-b.created ); const wrap=document.createElement('div'); wrap.innerHTML='<div class="flex justify-between small-muted"><div>BIDS</div><div>ASKS</div></div>'; const table=document.createElement('div'); table.className='grid grid-cols-2 gap-2 mt-2'; const left=document.createElement('div'); bids.slice(0,20).forEach(b=>{ const d=document.createElement('div'); d.textContent = `${b.user} ${b.qty} @ ${b.price||'MKT'}`; left.appendChild(d); }); const right=document.createElement('div'); asks.slice(0,20).forEach(a=>{ const d=document.createElement('div'); d.textContent = `${a.user} ${a.qty} @ ${a.price||'MKT'}`; right.appendChild(d); }); table.appendChild(left); table.appendChild(right); out.appendChild(wrap); out.appendChild(table); }
+// --- Bets and spin ---
+let pendingBets = [];
+function addRoundLog(msg){
+  STATE.rounds.push({ time: new Date().toLocaleString(), msg, user: currentUser?currentUser.username:'(guest)' });
+  saveState(); renderUser();
+}
 
-function renderTrades(){ const out = document.getElementById('trades'); out.innerHTML=''; DB.trades.slice(0,200).forEach(t=>{ const d=document.createElement('div'); d.className='p-1 border-b border-slate-700'; d.textContent = `${new Date(t.time).toLocaleTimeString()} ${t.ticker} ${t.qty}@${t.price.toFixed(2)} B:${t.buyer} S:${t.seller}`; out.appendChild(d); }); }
+function placeBet(bet){
+  if(!currentUser) { alert('Bạn phải đăng nhập để đặt cược'); return; }
+  if(bet.amount <=0 || isNaN(bet.amount)) return alert('Số tiền không hợp lệ');
+  if(currentUser.balance < bet.amount) return alert('Không đủ tiền');
+  // deduct immediately
+  currentUser.balance -= bet.amount;
+  STATE.users[currentUser.username].balance = currentUser.balance;
+  pendingBets.push({ ...bet, user: currentUser.username });
+  addRoundLog(`${currentUser.username} đặt ${bet.game} — ${JSON.stringify(bet)} — ${bet.amount}`);
+  saveState(); renderUser();
+}
 
-function renderMarketInfo(){ const p = DB.tickers[selectedTicker].lastPrice; document.getElementById('cur-price').textContent = '$' + p.toFixed(2); const c = DB.tickers[selectedTicker].candles.slice(-1)[0]; if(c){ const change = ((c.close-c.open)/c.open*100).toFixed(2); document.getElementById('cur-change').textContent = change + '%'; document.getElementById('cur-vol').textContent = c.vol; } document.getElementById('last-trade').textContent = DB.trades[0]?('$'+DB.trades[0].price.toFixed(2)): '-' }
+// Bet buttons
+document.querySelectorAll('.bet-btn').forEach(b=>b.addEventListener('click', (e)=>{
+  const btn = e.currentTarget;
+  const game = btn.dataset.game;
+  if(game==='taixiu'){
+    const choice = btn.dataset.choice;
+    const amt = parseInt(document.getElementById('tx-amount').value || 0);
+    placeBet({ game:'taixiu', choice, amount:amt });
+  } else if(game==='baucua'){
+    const face = document.getElementById('bc-face').value;
+    const amt = parseInt(document.getElementById('bc-amount').value || 0);
+    placeBet({ game:'baucua', face, amount:amt });
+  } else if(game==='chanle'){
+    const choice = btn.dataset.choice;
+    const amt = parseInt(document.getElementById('cl-amount').value || 0);
+    placeBet({ game:'chanle', choice, amount:amt });
+  }
+}));
 
-function renderPortfolio(){ const out=document.getElementById('portfolio'); out.innerHTML=''; if(!currentUser) return out.innerHTML='<div class="small-muted">Login to see portfolio</div>';
-  const u = DB.users[currentUser]; let total=u.cash; let html = `<div>Cash: $${u.cash.toFixed(2)}</div>`; for(const [code,qty] of Object.entries(u.holdings||{})){ const price = DB.tickers[code]?.lastPrice||0; const v = price*qty; total+=v; html += `<div class="flex justify-between"><div>${code} x ${qty}</div><div>$${v.toFixed(2)}</div></div>` }
-  html += `<hr class="my-2"> <div class="font-semibold">Total: $${total.toFixed(2)}</div>`; out.innerHTML = html; }
-
-function renderLeaderboard(){ const out = document.getElementById('leaderboard'); out.innerHTML=''; const arr = Object.values(DB.users).map(u=>{ let total=u.cash; for(const [code,qty] of Object.entries(u.holdings||{})){ total += (DB.tickers[code]?.lastPrice||0)*qty } return { name:u.username, total }; }).sort((a,b)=>b.total-a.total); out.innerHTML = arr.slice(0,10).map(x=>`<div class="flex justify-between"><div>${x.name}</div><div>$${x.total.toFixed(2)}</div></div>`).join(''); }
-
-function renderQuickPanel(){ const el = document.getElementById('quick-panel'); if(!currentUser) return el.textContent='Login to trade'; const u=DB.users[currentUser]; el.innerHTML = `<div>Cash: $${u.cash.toFixed(2)}</div><div class="small-muted">Pending orders: ${DB.orders.filter(o=>o.user===currentUser && o.status==='open').length}</div>` }
-
-/* Admin modal actions */
-document.getElementById('open-admin').addEventListener('click', ()=>{
-  const user = prompt('Admin username to login as admin:'); if(!user) return; if(!DB.users[user]) return alert('No such user'); if(!DB.users[user].isAdmin) return alert('User is not admin'); const pw = prompt('Password for admin'); verifyPassword(pw, DB.users[user].salt, DB.users[user].hash).then(ok=>{ if(ok){ currentUser = user; renderTop(); renderAuthArea(); document.getElementById('admin-modal').classList.remove('hidden'); renderTickerList(); renderUserList(); } else alert('Wrong password') });
+// Spin
+document.getElementById('spin-btn').addEventListener('click', ()=>{
+  if(pendingBets.length===0){ alert('Chưa có cược nào'); return; }
+  runRound();
 });
 
-document.getElementById('admin-close').addEventListener('click', ()=>{ document.getElementById('admin-modal').classList.add('hidden'); });
+function rollDie(){ return cryptoRandInt(6)+1; }
 
-function renderTickerList(){ const el=document.getElementById('ticker-list'); el.innerHTML=''; Object.values(DB.tickers).forEach(t=>{ const d=document.createElement('div'); d.className='flex items-center justify-between p-1'; d.innerHTML = `<div>${t.code} — ${t.name} $${t.lastPrice.toFixed(2)}</div>`; const btnDel = document.createElement('button'); btnDel.textContent='Delete'; btnDel.className='px-2 py-0.5 rounded bg-red-600 text-xs'; btnDel.onclick=()=>{ if(confirm('Delete ticker?')){ delete DB.tickers[t.code]; saveDB(DB); renderTickerList(); renderTickerSelect(); } }; d.appendChild(btnDel); el.appendChild(d); }); }
+function runRound(){
+  // roll 3 dice
+  const d1 = rollDie(), d2 = rollDie(), d3 = rollDie();
+  const faces = ['','bau','cua','tom','ca','ga','nai']; // 1..6
+  const faceNames = [null,'Bầu','Cua','Tôm','Cá','Gà','Nai'];
+  const diceFaces = [faces[d1], faces[d2], faces[d3]];
+  const sum = d1 + d2 + d3;
+  const isTriple = (d1===d2 && d2===d3);
+  const resText = `Xúc xắc: ${d1}, ${d2}, ${d3} — ${diceFaces.map(f=>f).join(', ')} — Tổng=${sum}`;
 
-document.getElementById('add-ticker').addEventListener('click', ()=>{ const code=document.getElementById('new-code').value.trim().toUpperCase(); const name=document.getElementById('new-name').value.trim(); const price=parseFloat(document.getElementById('new-price').value)||10; if(!code) return alert('Enter code'); DB.tickers[code]=makeTicker(code,name||code,price); saveDB(DB); renderTickerList(); renderTickerSelect(); });
+  // process bets
+  const results = [];
+  for(const bet of pendingBets){
+    let win = 0;
+    if(bet.game==='taixiu'){
+      const side = (sum>=11 && sum<=17)?'tai':'xiu';
+      // demo rule: triple => all tài/xỉu lose
+      if(isTriple){ win = 0; }
+      else if(bet.choice===side){ win = bet.amount * 2; } // 1:1 payout (win gives back 2x incl stake)
+    } else if(bet.game==='baucua'){
+      // count occurrences
+      const count = diceFaces.filter(f=>f===bet.face).length;
+      if(count>0) win = bet.amount * (1 + count); // return stake + count * stake
+    } else if(bet.game==='chanle'){
+      const side = (sum%2===0)?'chan':'le';
+      if(bet.choice===side){ win = bet.amount * 2; }
+    }
+    // settle
+    if(win>0){
+      STATE.users[bet.user].balance += win;
+      results.push(`${bet.user} thắng ${new Intl.NumberFormat().format(win)} (${bet.game})`);
+    } else {
+      results.push(`${bet.user} thua ${new Intl.NumberFormat().format(bet.amount)} (${bet.game})`);
+    }
+  }
 
-function renderUserList(){ const el=document.getElementById('user-list'); el.innerHTML=''; Object.values(DB.users).forEach(u=>{ const d=document.createElement('div'); d.className='p-1 border-b border-slate-700 flex items-center justify-between'; d.innerHTML = `<div><div class="font-semibold">${u.username}${u.isAdmin? ' (admin)':''}</div><div class="small-muted">$${u.cash.toFixed(2)}</div></div>`; const actions=document.createElement('div'); const btnCash=document.createElement('button'); btnCash.textContent='Add $'; btnCash.className='px-2 py-0.5 rounded bg-green-600 text-xs'; btnCash.onclick=()=>{ const v=parseFloat(prompt('Amount to add',1000)||0); u.cash += v; saveDB(DB); renderUserList(); renderLeaderboard(); renderPortfolio(); }; actions.appendChild(btnCash); const btnDel=document.createElement('button'); btnDel.textContent='Delete'; btnDel.className='px-2 py-0.5 rounded bg-red-600 text-xs ml-1'; btnDel.onclick=()=>{ if(confirm('Delete user?')){ delete DB.users[u.username]; saveDB(DB); renderUserList(); renderLeaderboard(); } }; actions.appendChild(btnDel); d.appendChild(actions); el.appendChild(d); }); }
+  // record
+  const roundMsg = `${resText} — ${results.join(' | ')}`;
+  STATE.rounds.push({ time: new Date().toLocaleString(), msg: roundMsg, user:'system' });
+  saveState();
+  pendingBets = [];
+  lastRoundEl.textContent = roundMsg;
+  renderUser();
+}
 
-document.getElementById('seed-users').addEventListener('click', async ()=>{ for(let i=1;i<=3;i++){ const name='User'+i; const pw='pass'+i; const {salt,hash}=await hashPassword(pw); DB.users[name]={ username:name, salt, hash, hashAlgo:'SHA-256', cash:10000, holdings:{}, created:Date.now() } } saveDB(DB); renderUserList(); renderLeaderboard(); alert('Seeded users: User1..User3 (password pass1/pass2/pass3)') });
+// --- Auth form handlers ---
+document.getElementById('register-btn').addEventListener('click', async ()=>{
+  const u = document.getElementById('username').value;
+  const p = document.getElementById('password').value;
+  try{ await register(u,p); alert('Đăng ký thành công — hãy đăng nhập'); }
+  catch(e){ alert('Lỗi: '+e); }
+});
 
-document.getElementById('reset-db').addEventListener('click', ()=>{ if(confirm('Reset entire DB?')){ localStorage.removeItem(LSKEY); location.reload(); } });
+document.getElementById('login-btn').addEventListener('click', async ()=>{
+  const u = document.getElementById('username').value;
+  const p = document.getElementById('password').value;
+  try{ await login(u,p); alert('Đăng nhập thành công'); }
+  catch(e){ alert('Lỗi: '+e); }
+});
 
-/* Auth modal */
-function openAuth(){ document.getElementById('auth-modal').classList.remove('hidden'); }
-function closeAuth(){ document.getElementById('auth-modal').classList.add('hidden'); }
+// --- Admin actions ---
+document.getElementById('admin-adjust').addEventListener('click', ()=>{
+  const tgt = document.getElementById('admin-target').value.trim().toLowerCase();
+  const amt = parseInt(document.getElementById('admin-amount').value || 0);
+  if(!STATE.users[tgt]) return alert('Không tìm thấy user');
+  STATE.users[tgt].balance += amt;
+  saveState(); renderUser();
+  addRoundLog(`Admin thay đổi ${tgt} ${amt}`);
+});
 
-document.getElementById('btn-register').addEventListener('click', async ()=>{ const u=document.getElementById('reg-username').value.trim(); const p=document.getElementById('reg-password').value; const p2=document.getElementById('reg-password2').value; if(!u||!p) return alert('Enter username and password'); if(p!==p2) return alert('Passwords mismatch'); if(DB.users[u]) return alert('Username exists'); const {salt,hash}=await hashPassword(p); DB.users[u]={ username:u, salt, hash, cash:10000, holdings:{}, created:Date.now() }; saveDB(DB); currentUser=u; renderTop(); renderAuthArea(); renderPortfolio(); renderLeaderboard(); closeAuth(); });
+document.getElementById('admin-reset').addEventListener('click', ()=>{
+  if(!confirm('Bạn có chắc reset dữ liệu demo?')) return;
+  localStorage.removeItem(DB.key);
+  location.reload();
+});
 
-document.getElementById('btn-login').addEventListener('click', async ()=>{ const u=document.getElementById('reg-username').value.trim(); const p=document.getElementById('reg-password').value; if(!u||!p) return alert('Enter username and password'); if(!DB.users[u]) return alert('No such user'); const ok = await verifyPassword(p, DB.users[u].salt, DB.users[u].hash); if(ok){ currentUser=u; renderTop(); renderAuthArea(); renderPortfolio(); renderLeaderboard(); closeAuth(); } else alert('Wrong credentials'); });
+// Save admin creds (demo only)
+document.getElementById('admin-save-creds').addEventListener('click', ()=>{
+  const au = document.getElementById('admin-user').value.trim();
+  const ap = document.getElementById('admin-pass').value.trim();
+  if(!au||!ap) return alert('Nhập đủ');
+  // This demo simply stores plaintext in STATE.config for ease; in prod never do this
+  STATE.config.adminUser = au; STATE.config.adminPass = ap;
+  // also create user if not exists
+  if(!STATE.users[au]) STATE.users[au] = { username:au, salt:'', passHash:'', balance:100000, isAdmin:true };
+  STATE.users[au].isAdmin = true;
+  saveState(); alert('Lưu (demo). Để thay đổi mật khẩu admin thật, dùng chức năng đăng ký + đổi pass hoặc triển khai server.');
+});
 
-document.getElementById('btn-guest').addEventListener('click', ()=>{ const name='Guest'+Math.floor(Math.random()*9000+1000); DB.users[name]={ username:name, salt:'', hash:'', guest:true, cash:5000, holdings:{}, created:Date.now() }; saveDB(DB); currentUser=name; renderTop(); renderAuthArea(); renderPortfolio(); renderLeaderboard(); closeAuth(); });
+// initial render
+renderUser();
 
-/* ticker & candle select handlers */
-tickerSelect.addEventListener('change', (e)=>{ selectedTicker = e.target.value; renderMarketInfo(); renderOrderbook(); renderChart(); });
-candleInterval.addEventListener('change', ()=>{ DB.settings.candleInterval = parseInt(candleInterval.value); saveDB(DB); });
-
-/* Simulation loop */
-let simHandle = null;
-function startSim(){ if(simHandle) clearInterval(simHandle); simHandle = setInterval(()=>{ // each sim tick
-  // simulate tiny random walk on every ticker's lastPrice if no trades
-  Object.keys(DB.tickers).forEach(code=>{ const t=DB.tickers[code]; if(Math.random()<0.3){ t.lastPrice = Math.max(0.01, t.lastPrice*(1+(Math.random()-0.5)*0.01)); } buildCandle(code); });
-  matchEngineTick(); saveDB(DB);
-}, DB.settings.simTick || 1000); }
-startSim();
-
-/* initial render */
-renderTickerSelect(); renderTop(); renderAuthArea(); renderPortfolio(); renderLeaderboard(); renderOrderbook(); renderTrades(); renderMarketInfo(); renderChart(); renderTickerList(); renderUserList();
-
-window.addEventListener('resize', ()=>{ renderChart() });
+// --- Notes for deploy to AppsGeyser:
+// 1) Save this file as index.html and upload to a web hosting (HTTPS recommended) OR directly paste HTML into AppsGeyser WebView if they accept raw HTML.
+// 2) AppsGeyser usually wraps your web page into an Android app; ensure you serve via HTTPS for best compatibility.
+// 3) THIS DEMO is purely client-side—sensitive operations (auth, wallets, payouts) MUST be moved to a secure server for a production app.
 
 </script>
 </body>
