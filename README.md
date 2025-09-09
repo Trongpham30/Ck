@@ -1,347 +1,511 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ChatBot Demo — AppsGeyser</title>
-<style>
-  :root{ --bg:#0b1220; --card:#071021; --accent:#06b6d4; --muted:#9aa8b7; color-scheme: dark; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-  html,body{height:100%; margin:0; background:linear-gradient(180deg,#051019,#071028); color:#e6eef6}
-  .wrap{max-width:900px;margin:12px auto;padding:12px}
-  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .logo{display:flex;gap:10px;align-items:center}
-  .logo-box{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#0369a1);display:flex;align-items:center;justify-content:center;font-weight:700}
-  .title{font-weight:700}
-  .sub{color:var(--muted);font-size:13px}
-  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:10px; padding:12px; border:1px solid rgba(255,255,255,0.03)}
-  .chat-window{height:60vh; overflow:auto; padding:12px; margin:10px 0; border-radius:8px; background:linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.08)); border:1px solid rgba(255,255,255,0.02)}
-  .msg{display:flex; margin-bottom:10px}
-  .msg.me{justify-content:flex-end}
-  .bubble{max-width:75%; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,0.03); color:inherit}
-  .bubble.me{background:linear-gradient(90deg,#065f46,#0ea5a4); color:#022}
-  .meta{font-size:12px; color:var(--muted); margin-bottom:6px}
-  .controls{display:flex; gap:8px; align-items:center}
-  input[type=text], textarea{width:100%; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:inherit}
-  button{padding:8px 12px; border-radius:8px; border: none; background:var(--accent); color:#022; font-weight:600; cursor:pointer}
-  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.03); color:var(--muted)}
-  .small{font-size:13px;color:var(--muted)}
-  .row{display:flex; gap:8px; align-items:center}
-  .sticky-bottom{position:sticky; bottom:0; background:linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.02)); padding-top:6px}
-  .badge{font-size:12px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02); color:var(--muted)}
-  .switch{display:inline-flex; align-items:center; gap:6px}
-  .export-area{width:100%; height:90px; margin-top:8px; padding:8px; border-radius:8px; background:transparent; border:1px dashed rgba(255,255,255,0.03); color:var(--muted)}
-  @media (max-width:720px){ .chat-window{height:55vh} }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stock Game - Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lightweight Charts (TradingView) -->
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    /* small custom tweaks */
+    html,body,#app{height:100%}
+    .glass{backdrop-filter: blur(6px); background: rgba(255,255,255,0.6)}
+  </style>
 </head>
-<body>
-  <div class="wrap">
-    <header>
-      <div class="logo">
-        <div class="logo-box">CB</div>
+<body class="bg-slate-100 font-sans" >
+  <div id="app" class="min-h-screen flex flex-col">
+    <header class="p-4 bg-white/80 shadow sticky top-0 z-20 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white font-bold">SG</div>
         <div>
-          <div class="title">ChatBot Auto — Demo</div>
-          <div class="sub">Dán file này vào AppsGeyser để tạo app chat tự động</div>
+          <div class="text-lg font-semibold">Stock Game</div>
+          <div class="text-sm text-slate-500">Ứng dụng demo - dán vào AppsGeyser</div>
         </div>
       </div>
-      <div class="small">Local demo · No server</div>
+      <div class="flex items-center gap-4">
+        <div id="welcome" class="text-sm text-slate-600"></div>
+        <button id="btn-logout" class="hidden px-3 py-1 rounded bg-rose-500 text-white text-sm">Logout</button>
+        <button id="btn-show-auth" class="px-3 py-1 rounded bg-indigo-600 text-white text-sm">Đăng nhập / Đăng ký</button>
+      </div>
     </header>
 
-    <div class="card">
-      <div style="display:flex;justify-content:space-between; align-items:center;">
+    <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <!-- Left: Controls + tickers -->
+      <section class="col-span-1 glass p-4 rounded shadow">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold">Tickers</h3>
+          <div>
+            <select id="interval" class="px-2 py-1 border rounded text-sm">
+              <option value="1">1s</option>
+              <option value="5">5s</option>
+              <option value="10">10s</option>
+              <option value="15">15s</option>
+              <option value="30">30s</option>
+              <option value="60">1m</option>
+            </select>
+          </div>
+        </div>
+        <div id="tickers-list" class="space-y-2 max-h-72 overflow-auto"></div>
+
+        <div class="mt-4">
+          <h4 class="font-medium">Mua/Bán nhanh</h4>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <input id="order-qty" type="number" min="1" value="1" class="p-2 border rounded" />
+            <select id="order-side" class="p-2 border rounded">
+              <option value="buy">Mua</option>
+              <option value="sell">Bán</option>
+            </select>
+            <select id="order-ticker" class="p-2 border rounded col-span-2"></select>
+            <button id="btn-order" class="col-span-2 p-2 bg-emerald-500 text-white rounded">Thực hiện</button>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <h4 class="font-medium">Người chơi</h4>
+          <div id="player-stats" class="text-sm text-slate-700 mt-2"></div>
+        </div>
+      </section>
+
+      <!-- Middle: Chart -->
+      <section class="col-span-2 lg:col-span-2 glass p-4 rounded shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">Biểu đồ nến</h3>
+          <div class="text-sm text-slate-500">Cập nhật động từng giây</div>
+        </div>
+        <div id="chart" style="height:420px"></div>
+        <div class="mt-3 grid grid-cols-3 gap-2">
+          <div class="p-3 rounded bg-white shadow-sm">
+            <div class="text-xs text-slate-500">Giá hiện tại</div>
+            <div id="price-now" class="text-lg font-bold">-</div>
+          </div>
+          <div class="p-3 rounded bg-white shadow-sm">
+            <div class="text-xs text-slate-500">Change</div>
+            <div id="price-change" class="text-lg font-bold">-</div>
+          </div>
+          <div class="p-3 rounded bg-white shadow-sm">
+            <div class="text-xs text-slate-500">Volume (sim)</div>
+            <div id="price-vol" class="text-lg font-bold">-</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Orders & Admin -->
+      <aside class="col-span-1 glass p-4 rounded shadow">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="font-semibold">Orderbook & Lịch sử</h4>
+          <button id="btn-open-admin" class="text-xs px-2 py-1 bg-yellow-400 rounded">Admin</button>
+        </div>
+        <div id="orderbook" class="text-sm max-h-48 overflow-auto"></div>
+        <hr class="my-3" />
         <div>
-          <div style="font-weight:700">Cuộc trò chuyện</div>
-          <div class="small">Bot tự động / Lưu cục bộ (localStorage)</div>
+          <h4 class="font-medium">Lịch sử giao dịch</h4>
+          <div id="trades" class="text-sm max-h-40 overflow-auto mt-2"></div>
         </div>
-        <div class="row">
-          <div class="switch">
-            <label class="small">Auto-generate</label>
-            <input id="autoToggle" type="checkbox" />
-          </div>
-          <button id="clearBtn" class="btn-ghost">Xóa</button>
-        </div>
+      </aside>
+    </main>
+
+    <footer class="p-3 text-center text-xs text-slate-500">Demo app — không dùng cho giao dịch thật. Để triển khai an toàn, dùng server + Firebase/Auth hoặc backend có hashing & HTTPS.</footer>
+  </div>
+
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="fixed inset-0 hidden items-center justify-center bg-black/40 z-50">
+    <div class="bg-white rounded p-4 w-full max-w-md">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-semibold">Đăng nhập / Đăng ký</h3>
+        <button id="close-auth" class="text-slate-500">✕</button>
       </div>
-
-      <div id="chat" class="chat-window" aria-live="polite"></div>
-
-      <div class="sticky-bottom">
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
-          <input id="inputMsg" type="text" placeholder="Nhập tin nhắn..." />
-          <button id="sendBtn">Gửi</button>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <h4 class="font-medium mb-2">Đăng nhập</h4>
+          <input id="login-user" placeholder="Username" class="w-full p-2 border rounded mb-2" />
+          <input id="login-pass" placeholder="Password" type="password" class="w-full p-2 border rounded mb-2" />
+          <button id="btn-login-local" class="w-full p-2 bg-indigo-600 text-white rounded">Login</button>
         </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <input id="botName" type="text" placeholder="Tên bot (mặc định: Thảo)" style="width:200px" />
-          <button id="startConv" class="btn-ghost">Bot bắt chuyện</button>
-          <div style="flex:1"></div>
-          <div class="badge" id="statusBadge">Status: idle</div>
-        </div>
-      </div>
-
-      <hr style="margin:12px 0; border-color:rgba(255,255,255,0.03)" />
-
-      <div style="display:flex; gap:12px; flex-wrap:wrap;">
-        <div style="flex:1; min-width:220px">
-          <div style="font-weight:700; margin-bottom:6px">Thiết lập</div>
-          <div class="small">Chu kỳ tự động (s)</div>
-          <input id="autoInterval" type="number" value="8" min="2" style="width:110px; margin-top:6px" />
-          <div class="small" style="margin-top:8px">Chế độ trả lời</div>
-          <select id="replyMode" style="margin-top:6px; width:220px">
-            <option value="smart">Smart (mẫu + keyword)</option>
-            <option value="echo">Echo (nhắc lại)</option>
-            <option value="random">Random (vui)</option>
-          </select>
-        </div>
-
-        <div style="flex:1; min-width:220px">
-          <div style="font-weight:700; margin-bottom:6px">Xuất/nhập lịch sử</div>
-          <div class="small">Export JSON</div>
-          <textarea id="exportBox" class="export-area" readonly></textarea>
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button id="exportBtn" class="btn">Export</button>
-            <button id="importBtn" class="btn-ghost">Import (paste JSON)</button>
-          </div>
-        </div>
-
-        <div style="flex:1; min-width:220px">
-          <div style="font-weight:700; margin-bottom:6px">Thông tin nhanh</div>
-          <div class="small">- Bot mô phỏng: dễ tích hợp webhook hoặc API nếu bạn có server.</div>
-          <div class="small" style="margin-top:6px">- AppsGeyser có thể chặn remote scripts — nếu bot dùng API cần host backend riêng.</div>
+        <div>
+          <h4 class="font-medium mb-2">Đăng ký</h4>
+          <input id="reg-user" placeholder="Username" class="w-full p-2 border rounded mb-2" />
+          <input id="reg-pass" placeholder="Password" type="password" class="w-full p-2 border rounded mb-2" />
+          <button id="btn-register" class="w-full p-2 bg-emerald-500 text-white rounded">Register</button>
         </div>
       </div>
     </div>
-
-    <footer style="margin-top:10px; text-align:center; color:var(--muted); font-size:13px">
-      Built for AppsGeyser — Dán HTML này vào form tạo app.
-    </footer>
   </div>
 
-<script>
-/* ChatBot Auto — single-file JS
- - Lưu lịch sử ở localStorage
- - Auto-generate conversation khi bật (bot tự gửi theo chu kỳ)
- - 3 chế độ trả lời: smart, echo, random
- - Typing indicator, simple rule-based replies
-*/
+  <!-- Admin Modal -->
+  <div id="admin-modal" class="fixed inset-0 hidden items-center justify-center bg-black/40 z-50">
+    <div class="bg-white rounded p-4 w-full max-w-2xl">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-semibold">Admin Dashboard</h3>
+        <button id="close-admin" class="text-slate-500">✕</button>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <h4 class="font-medium">Quản lý người dùng</h4>
+          <div id="admin-users" class="max-h-48 overflow-auto text-sm mt-2"></div>
+        </div>
+        <div>
+          <h4 class="font-medium">Quản lý tickers</h4>
+          <div class="flex gap-2">
+            <input id="admin-ticker-name" placeholder="Mã VD: ABC" class="p-2 border rounded w-1/2" />
+            <input id="admin-ticker-price" placeholder="Start" type="number" class="p-2 border rounded w-1/2" />
+          </div>
+          <div class="mt-2 flex gap-2">
+            <button id="btn-add-ticker" class="px-3 py-1 bg-indigo-600 text-white rounded">Thêm</button>
+            <button id="btn-reset-db" class="px-3 py-1 bg-rose-500 text-white rounded">Reset</button>
+          </div>
+          <div class="text-xs text-slate-500 mt-2">Admin mặc định: username <code>admin</code>, password <code>admin123</code>. Đổi ngay trong bảng Users.</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-const CHAT_KEY = 'appsgeyser_chat_demo_v1';
-let state = {
-  messages: [], // {id, sender:'me'|'bot', text, time}
-  auto: false,
-  intervalSec: 8,
-  replyMode: 'smart',
-  botName: 'Thảo',
-  isTyping: false
-};
+  <script>
+  // ---------- Simple client-only stock game (single-file) ----------
+  // WARNING: This is a frontend-only demo. For real security and persistence,
+  // build a backend (Node/FastAPI) with HTTPS and server-side password hashing.
 
-const chatEl = document.getElementById('chat');
-const inputMsg = document.getElementById('inputMsg');
-const sendBtn = document.getElementById('sendBtn');
-const clearBtn = document.getElementById('clearBtn');
-const autoToggle = document.getElementById('autoToggle');
-const autoInterval = document.getElementById('autoInterval');
-const replyMode = document.getElementById('replyMode');
-const botNameInput = document.getElementById('botName');
-const startConvBtn = document.getElementById('startConv');
-const statusBadge = document.getElementById('statusBadge');
-const exportBox = document.getElementById('exportBox');
-const exportBtn = document.getElementById('exportBtn');
-const importBtn = document.getElementById('importBtn');
-
-function uid(){ return 'm'+Math.random().toString(36).slice(2,9); }
-function now(){ return new Date().toISOString(); }
-
-// persistence
-function loadState(){
-  try{
-    const raw = localStorage.getItem(CHAT_KEY);
-    if(raw){ state.messages = JSON.parse(raw); }
-  }catch(e){ console.warn('load failed', e); }
-}
-function saveState(){
-  try{ localStorage.setItem(CHAT_KEY, JSON.stringify(state.messages)); }catch(e){ console.warn('save failed', e); }
-}
-
-// render
-function render(){
-  chatEl.innerHTML = '';
-  state.messages.forEach(m=>{
-    const container = document.createElement('div');
-    container.className = 'msg ' + (m.sender==='me'? 'me':'');
-    const meta = document.createElement('div');
-    meta.className = 'meta small';
-    meta.innerText = `${m.sender==='me' ? 'Bạn' : (m.sender==='bot' ? (m.botName || state.botName) : m.sender)} · ${new Date(m.time).toLocaleString()}`;
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble ' + (m.sender==='me' ? 'me':'');
-    bubble.innerText = m.text;
-    container.appendChild(bubble);
-    container.appendChild(meta);
-    chatEl.appendChild(container);
-  });
-
-  // typing indicator
-  if(state.isTyping){
-    const t = document.createElement('div'); t.className='msg';
-    const bubble = document.createElement('div'); bubble.className='bubble'; bubble.innerText='...';
-    t.appendChild(bubble);
-    chatEl.appendChild(t);
+  // Utilities - hashing password via WebCrypto
+  async function hashPassword(pw){
+    const enc = new TextEncoder();
+    const data = enc.encode(pw);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
   }
 
-  // scroll bottom
-  chatEl.scrollTop = chatEl.scrollHeight;
-  statusBadge.innerText = `Status: ${state.auto ? 'auto' : 'idle'}`;
-}
-
-// send message
-function send(text){
-  if(!text) return;
-  const m = { id: uid(), sender:'me', text, time: now() };
-  state.messages.push(m);
-  saveState();
-  render();
-  // bot reply
-  setTimeout(()=>botReply(text), 400);
-}
-
-// bot reply logic
-function botReply(userText){
-  // select behavior based on replyMode
-  const mode = state.replyMode;
-  let replyText = '';
-  if(mode === 'echo'){
-    replyText = `Bạn vừa nói: "${userText}"`;
-  } else if(mode === 'random'){
-    const jokes = [
-      'Haha, nghe vui đấy 😄',
-      'Mình hiểu rồi!',
-      'Ồ, nói rõ hơn được không?',
-      'Thật không? kể mình nghe thêm đi.',
-      'Mình đang tìm thông tin...'
-    ];
-    replyText = jokes[Math.floor(Math.random()*jokes.length)];
-  } else { // smart (keyword)
-    const u = userText.toLowerCase();
-    if(u.includes('xin chào') || u.includes('hello') || u.includes('hi')) replyText = `Xin chào! Mình là ${state.botName}. Bạn có thể hỏi mình bất cứ điều gì.`;
-    else if(u.includes('tên') && u.includes('gì')) replyText = `Mình tên là ${state.botName}. Rất vui được trò chuyện!`;
-    else if(u.includes('thời tiết')) replyText = `Mình không có dữ liệu thời tiết trực tiếp trong app demo này. Bạn cần mình hướng dẫn cách lấy thời tiết từ API không?`;
-    else if(u.includes('giờ') || u.includes('time')) replyText = `Bây giờ là ${new Date().toLocaleString()}`;
-    else if(u.includes('cách') && u.includes('làm')) replyText = `Bạn đang cần hướng dẫn cụ thể chỗ nào hơn? Mô tả ngắn giúp mình nhé.`;
-    else replyText = `Mình nghe bạn: "${userText}". Bạn muốn mình trả lời chi tiết hay gợi ý?`;
+  // Local DB helpers
+  function loadDB(){
+    const json = localStorage.getItem('stockgame-db');
+    if(json) return JSON.parse(json);
+    const db = {
+      users: [],
+      tickers: [],
+      trades: [],
+      orders: [],
+      settings: {interval:1}
+    };
+    // seed admin
+    db.users.push({username:'admin', passwordHash:null, cash:100000, isAdmin:true});
+    // we'll set admin password hash on first run
+    localStorage.setItem('stockgame-db', JSON.stringify(db));
+    return db;
   }
-
-  // simulate typing
-  state.isTyping = true; render();
-  const typingDelay = 600 + Math.random()*1200;
-  setTimeout(()=>{
-    state.isTyping = false;
-    const botMsg = { id: uid(), sender:'bot', botName: state.botName, text: replyText, time: now() };
-    state.messages.push(botMsg);
-    saveState();
-    render();
-  }, typingDelay);
-}
-
-// auto-generate conversation (bot initiates and replies)
-let autoTimer = null;
-function startAuto(){
-  stopAuto();
-  const sec = Math.max(2, Number(autoInterval.value) || 8);
-  state.auto = true;
-  state.intervalSec = sec;
-  function tick(){
-    // bot or user message alternation simulation
-    const rand = Math.random();
-    if(rand < 0.4){
-      // bot sends a prompt (initiates)
-      const prompts = [
-        'Chào bạn, hôm nay bạn thế nào?',
-        'Bạn thích chủ đề gì hôm nay?',
-        'Bạn đang cần trợ giúp về gì?',
-        'Mình có vài mẹo hay muốn chia sẻ...'
-      ];
-      const txt = prompts[Math.floor(Math.random()*prompts.length)];
-      state.isTyping = true; render();
-      setTimeout(()=> {
-        state.isTyping = false;
-        state.messages.push({ id: uid(), sender:'bot', botName: state.botName, text: txt, time: now() });
-        saveState(); render();
-      }, 800 + Math.random()*800);
-    } else {
-      // simulated user reply (bot will then auto-reply)
-      const replies = [
-        'OK, cho mình biết thêm.',
-        'Nghe hay đó!',
-        'Bạn có thể giải thích rõ hơn?',
-        'Mình đồng ý.',
-        'Thử hỏi một điều khác nhé.'
-      ];
-      const txt = replies[Math.floor(Math.random()*replies.length)];
-      state.messages.push({ id: uid(), sender:'me', text: txt, time: now() });
-      saveState(); render();
-      // bot auto-reply shortly
-      setTimeout(()=> botReply(txt), 600 + Math.random()*600);
+  async function ensureAdminPassword(db){
+    if(!db.users.find(u=>u.username==='admin').passwordHash){
+      const h = await hashPassword('admin123');
+      db.users = db.users.map(u=> u.username==='admin'?{...u,passwordHash:h}:u);
+      saveDB(db);
     }
   }
-  tick(); // immediate
-  autoTimer = setInterval(tick, sec*1000);
-  render();
-}
-function stopAuto(){
-  if(autoTimer) clearInterval(autoTimer);
-  autoTimer = null;
-  state.auto = false;
-  render();
-}
+  function saveDB(db){ localStorage.setItem('stockgame-db', JSON.stringify(db)); }
 
-// UI wiring
-sendBtn.onclick = ()=>{ send(inputMsg.value.trim()); inputMsg.value=''; inputMsg.focus(); };
-inputMsg.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); sendBtn.click(); } });
-clearBtn.onclick = ()=>{ if(confirm('Xóa toàn bộ cuộc trò chuyện?')){ state.messages=[]; saveState(); render(); } };
-autoToggle.onchange = (e)=>{ if(e.target.checked) startAuto(); else stopAuto(); };
-autoInterval.onchange = ()=>{ if(state.auto) startAuto(); };
-replyMode.onchange = ()=>{ state.replyMode = replyMode.value; };
-botNameInput.onchange = ()=>{ state.botName = botNameInput.value.trim() || 'Thảo'; };
-startConvBtn.onclick = ()=>{
-  const starter = [
-    `Xin chào! Mình là ${state.botName}. Bạn cần giúp gì?`,
-    `Chào bạn, mình có thể hỗ trợ những gì hôm nay?`
-  ];
-  state.messages.push({ id: uid(), sender:'bot', botName: state.botName, text: starter[Math.floor(Math.random()*starter.length)], time: now() });
-  saveState(); render();
-};
+  // Simulated market engine
+  const db = loadDB();
+  let chart = null;
+  let series = null;
+  let currentTicker = null;
+  let candleMap = {}; // ticker -> array of candles
+  let players = {}; // username -> user summary cached
 
-// export/import
-exportBtn.onclick = ()=>{
-  exportBox.value = JSON.stringify(state.messages, null, 2);
-  alert('Đã tạo JSON trong ô Export. Bạn có thể sao chép để lưu.');
-};
-importBtn.onclick = ()=>{
-  const raw = prompt('Dán JSON cuộc trò chuyện để import:', '');
-  if(!raw) return;
-  try{
-    const arr = JSON.parse(raw);
-    if(Array.isArray(arr)){ state.messages = arr; saveState(); render(); alert('Import OK'); }
-    else alert('JSON không đúng định dạng (mảng)');
-  }catch(e){ alert('JSON lỗi: '+e.message); }
-};
+  // seed some tickers if empty
+  if(db.tickers.length===0){
+    db.tickers = [
+      {code:'AAPL', price:175, vol:1000, volatility:0.6},
+      {code:'MSFT', price:340, vol:800, volatility:0.5},
+      {code:'TSLA', price:240, vol:1200, volatility:1.2},
+      {code:'VNDS', price:15, vol:2000, volatility:2.5}
+    ];
+    saveDB(db);
+  }
 
-// load on start
-loadState();
-render();
+  // UI elements
+  const el = id=>document.getElementById(id);
+  const intervalSelect = el('interval');
+  const tickersList = el('tickers-list');
+  const orderTicker = el('order-ticker');
+  const priceNow = el('price-now');
+  const priceChange = el('price-change');
+  const priceVol = el('price-vol');
+  const tradesDiv = el('trades');
+  const orderbookDiv = el('orderbook');
+  const playerStats = el('player-stats');
 
-// populate controls initial values
-autoInterval.value = state.intervalSec;
-replyMode.value = state.replyMode;
-botNameInput.value = state.botName;
+  // Auth UI
+  const authModal = el('auth-modal');
+  const adminModal = el('admin-modal');
+  const btnShowAuth = el('btn-show-auth');
+  const btnLogout = el('btn-logout');
+  const welcome = el('welcome');
 
-// helpful housekeeping: if there are no messages, add a greeting
-if(state.messages.length === 0){
-  state.messages.push({ id: uid(), sender:'bot', botName: state.botName, text: `Xin chào! Mình là ${state.botName}. Đây là demo chat tự động.`, time: now() });
-  saveState();
-  render();
-}
+  let currentUser = null;
 
-// cleanup on page hide
-window.addEventListener('beforeunload', ()=> saveState());
+  // initialize chart
+  function initChart(){
+    const chartEl = document.getElementById('chart');
+    chartEl.innerHTML = '';
+    chart = LightweightCharts.createChart(chartEl, {layout:{textColor:'#222',background:'#ffffff'}, rightPriceScale:{visible:true}});
+    series = chart.addCandlestickSeries();
+  }
 
-</script>
+  function renderTickers(){
+    tickersList.innerHTML = '';
+    orderTicker.innerHTML = '';
+    db.tickers.forEach(t=>{
+      const div = document.createElement('div');
+      div.className = 'flex items-center justify-between p-2 bg-white rounded shadow-sm';
+      div.innerHTML = `
+        <div>
+          <div class="font-medium">${t.code}</div>
+          <div class="text-sm text-slate-500">${t.price.toFixed(2)} • vol ${t.vol}</div>
+        </div>
+        <div class="flex gap-2">
+          <button class="px-2 py-1 text-xs bg-slate-100 rounded select-ticker" data-code="${t.code}">Xem</button>
+        </div>
+      `;
+      tickersList.appendChild(div);
+
+      const opt = document.createElement('option'); opt.value = t.code; opt.textContent = t.code; orderTicker.appendChild(opt);
+    });
+
+    document.querySelectorAll('.select-ticker').forEach(b=>b.addEventListener('click',()=>{
+      selectTicker(b.dataset.code);
+    }));
+  }
+
+  function selectTicker(code){
+    currentTicker = db.tickers.find(x=>x.code===code);
+    // prepare candle data if not existing
+    if(!candleMap[code]) candleMap[code] = generateInitialCandles(currentTicker);
+    series.setData(candleMap[code]);
+    updateOverview();
+  }
+
+  function generateInitialCandles(t){
+    const now = Math.floor(Date.now()/1000);
+    const out = [];
+    let price = t.price;
+    let vol = t.vol;
+    for(let i=60;i>0;i--){
+      const ts = (now - i);
+      const open = price;
+      const close = Math.max(0.01, price * (1 + (Math.random()-0.5)*t.volatility/100));
+      const high = Math.max(open, close) * (1 + Math.random()*0.002);
+      const low = Math.min(open, close) * (1 - Math.random()*0.002);
+      out.push({time:ts, open:open, high:high, low:low, close:close});
+      price = close;
+    }
+    return out;
+  }
+
+  // market tick - called every second
+  function marketTick(){
+    const iv = Number(intervalSelect.value);
+    // update each ticker price a bit
+    db.tickers.forEach(t=>{
+      // simple random walk
+      const changePct = (Math.random()-0.5) * t.volatility/100;
+      t.price = Math.max(0.01, t.price*(1+changePct));
+      t.vol = Math.max(1, Math.round(t.vol*(1 + (Math.random()-0.5)*0.05)));
+      // push a new raw tick into candleMap (we collapse client-side by second/min)
+      const now = Math.floor(Date.now()/1000);
+      if(!candleMap[t.code]) candleMap[t.code] = generateInitialCandles(t);
+      const arr = candleMap[t.code];
+      const last = arr[arr.length-1];
+      // if last.time == now then update it
+      if(last && last.time === now){
+        // expand
+        last.close = t.price;
+        last.high = Math.max(last.high,t.price);
+        last.low = Math.min(last.low,t.price);
+      } else {
+        arr.push({time:now, open:last?last.close:t.price, high:t.price, low:t.price, close:t.price});
+        // keep length
+        if(arr.length>500) arr.shift();
+      }
+    });
+
+    // refresh UI for currentTicker
+    if(currentTicker){
+      const arr = candleMap[currentTicker.code];
+      // to emulate candle interval (1s/5s/...) we will downsample
+      const candleData = downsampleCandles(arr, Number(intervalSelect.value));
+      series.setData(candleData);
+      const last = candleData[candleData.length-1];
+      priceNow.textContent = last.close.toFixed(2);
+      const first = candleData[0];
+      priceChange.textContent = ((last.close - candleData[0].open)/candleData[0].open*100).toFixed(2)+'%';
+      priceVol.textContent = currentTicker.vol;
+    }
+
+    renderPlayers();
+    renderOrderbook();
+  }
+
+  function downsampleCandles(arr, seconds){
+    // group by floor(time/seconds)
+    const map = new Map();
+    arr.forEach(c=>{
+      const k = Math.floor(c.time/seconds)*seconds;
+      if(!map.has(k)) map.set(k, {time:k, open:c.open, high:c.high, low:c.low, close:c.close});
+      else{
+        const o = map.get(k);
+        o.high = Math.max(o.high, c.high);
+        o.low = Math.min(o.low, c.low);
+        o.close = c.close;
+      }
+    });
+    return Array.from(map.values()).slice(-200);
+  }
+
+  // Orders & trades (very simple immediate execution)
+  function placeOrder(username, ticker, side, qty){
+    const user = db.users.find(u=>u.username===username);
+    if(!user) return false;
+    const t = db.tickers.find(x=>x.code===ticker);
+    if(!t) return false;
+    const price = t.price;
+    if(side==='buy'){
+      const cost = price*qty;
+      if(user.cash < cost) return false;
+      user.cash -= cost;
+      user.holdings = user.holdings || {};
+      user.holdings[ticker] = (user.holdings[ticker]||0) + qty;
+    } else {
+      user.holdings = user.holdings || {};
+      const have = user.holdings[ticker]||0;
+      if(have < qty) return false;
+      user.holdings[ticker] = have - qty;
+      user.cash += price*qty;
+    }
+    db.trades.unshift({time:Date.now(),user:username,ticker,side,qty,price});
+    if(db.trades.length>200) db.trades.pop();
+    saveDB(db);
+    return true;
+  }
+
+  // UI render players
+  function renderPlayers(){
+    const rows = db.users.map(u=>{
+      const totalHold = Object.entries(u.holdings||{}).reduce((s,[k,q])=>{
+        const t = db.tickers.find(x=>x.code===k); return s + (t? t.price*q:0);
+      },0);
+      return `<div class=\"p-2 bg-white rounded my-1\"><div class=\"flex justify-between\"><div><b>${u.username}</b> ${u.isAdmin?'<span class=\"text-xs text-yellow-600\">(ADMIN)</span>':''}</div><div>${(u.cash+totalHold).toFixed(2)} USD</div></div></div>`;
+    }).join('');
+    playerStats.innerHTML = rows;
+  }
+
+  function renderOrderbook(){
+    orderbookDiv.innerHTML = db.tickers.map(t=>`<div class=\"p-2 bg-white rounded my-1\"><div class=\"flex justify-between\"><div>${t.code}</div><div>${t.price.toFixed(2)}</div></div></div>`).join('');
+    tradesDiv.innerHTML = db.trades.map(tr=>`<div class=\"p-1 text-xs\">${new Date(tr.time).toLocaleTimeString()} - ${tr.user} ${tr.side} ${tr.qty} ${tr.ticker} @ ${tr.price.toFixed(2)}</div>`).join('');
+  }
+
+  // Auth logic
+  async function registerUser(username,password){
+    if(db.users.find(u=>u.username===username)) return {ok:false,msg:'Username tồn tại'};
+    const h = await hashPassword(password);
+    db.users.push({username,passwordHash:h,cash:10000,holdings:{},isAdmin:false});
+    saveDB(db);
+    return {ok:true};
+  }
+  async function loginUser(username,password){
+    const user = db.users.find(u=>u.username===username);
+    if(!user) return {ok:false,msg:'Không tìm thấy user'};
+    const h = await hashPassword(password);
+    if(h !== user.passwordHash) return {ok:false,msg:'Sai mật khẩu'};
+    currentUser = user;
+    el('btn-logout').classList.remove('hidden');
+    el('btn-show-auth').classList.add('hidden');
+    welcome.textContent = 'Xin chào, '+currentUser.username;
+    return {ok:true};
+  }
+
+  // Admin functions
+  function listAdminUsers(){
+    return db.users.map(u=>`<div class=\"p-2 bg-slate-50 rounded my-1 flex justify-between items-center\"><div><b>${u.username}</b> - ${u.cash} USD ${u.isAdmin?'<span class=\"text-xs text-yellow-600\">(ADMIN)</span>':''}</div><div><button data-user=\"${u.username}\" class=\"btn-set-admin text-xs px-2 py-1 bg-slate-200 rounded\">Toggle Admin</button> <button data-user=\"${u.username}\" class=\"btn-del-user text-xs px-2 py-1 bg-rose-200 rounded\">Xóa</button></div></div>`).join('');
+  }
+
+  function bindAdminActions(){
+    document.querySelectorAll('.btn-set-admin').forEach(btn=>btn.addEventListener('click',e=>{
+      const u = e.currentTarget.dataset.user;
+      const user = db.users.find(x=>x.username===u);
+      user.isAdmin = !user.isAdmin; saveDB(db); renderAdminUsers();
+    }));
+    document.querySelectorAll('.btn-del-user').forEach(btn=>btn.addEventListener('click',e=>{
+      const u = e.currentTarget.dataset.user;
+      if(u==='admin'){ alert('Không xóa admin mặc định'); return; }
+      const idx = db.users.findIndex(x=>x.username===u); if(idx>=0) db.users.splice(idx,1); saveDB(db); renderAdminUsers();
+    }));
+  }
+
+  function renderAdminUsers(){
+    el('admin-users').innerHTML = listAdminUsers(); bindAdminActions();
+  }
+
+  // UI events
+  el('btn-order').addEventListener('click',()=>{
+    if(!currentUser){ alert('Vui lòng đăng nhập'); return; }
+    const qty = Number(el('order-qty').value)||1;
+    const ticker = el('order-ticker').value;
+    const side = el('order-side').value;
+    const ok = placeOrder(currentUser.username,ticker,side,qty);
+    if(!ok) alert('Giao dịch thất bại (kiểm tra vốn / số lượng)'); else alert('Giao dịch thành công');
+  });
+
+  // Auth modal toggles
+  btnShowAuth.addEventListener('click',()=>{ authModal.classList.remove('hidden'); authModal.style.display='flex'; });
+  el('close-auth').addEventListener('click',()=>{ authModal.classList.add('hidden'); authModal.style.display='none'; });
+  el('btn-login-local').addEventListener('click', async ()=>{
+    const u = el('login-user').value.trim(); const p = el('login-pass').value;
+    const r = await loginUser(u,p);
+    if(!r.ok) alert(r.msg); else { authModal.classList.add('hidden'); authModal.style.display='none'; renderPlayers(); }
+  });
+  el('btn-register').addEventListener('click', async ()=>{
+    const u = el('reg-user').value.trim(); const p = el('reg-pass').value;
+    if(!u||!p){ alert('Điền đủ thông tin'); return; }
+    const r = await registerUser(u,p);
+    if(!r.ok) alert(r.msg); else { alert('Đăng ký thành công. Bạn đã có: 10,000 USD'); }
+  });
+  el('btn-logout').addEventListener('click',()=>{ currentUser=null; el('btn-logout').classList.add('hidden'); el('btn-show-auth').classList.remove('hidden'); welcome.textContent=''; });
+
+  // Admin modal
+  el('btn-open-admin').addEventListener('click',()=>{
+    // require admin
+    if(!currentUser || !currentUser.isAdmin){ alert('Chỉ admin mới vào được'); return; }
+    adminModal.classList.remove('hidden'); adminModal.style.display='flex'; renderAdminUsers();
+  });
+  el('close-admin').addEventListener('click',()=>{ adminModal.classList.add('hidden'); adminModal.style.display='none'; });
+  el('btn-add-ticker').addEventListener('click',()=>{
+    const code = el('admin-ticker-name').value.trim().toUpperCase();
+    const start = Number(el('admin-ticker-price').value)||1;
+    if(!code) return alert('Nhập mã');
+    db.tickers.push({code, price:start, vol:500, volatility:1.0}); saveDB(db); renderTickers(); renderAdminUsers();
+  });
+  el('btn-reset-db').addEventListener('click',()=>{
+    if(!confirm('Reset toàn bộ DB local?')) return;
+    localStorage.removeItem('stockgame-db'); location.reload();
+  });
+
+  // Admin shortcut: auto-login admin (user asked "admin đăng nhập luôn")
+  (async ()=>{
+    await ensureAdminPassword(db);
+    // auto-login admin so owner can manage immediately
+    const adminUser = db.users.find(u=>u.username==='admin');
+    currentUser = adminUser;
+    welcome.textContent = 'Xin chào, admin';
+    el('btn-logout').classList.remove('hidden');
+    el('btn-show-auth').classList.add('hidden');
+  })();
+
+  // initialize
+  initChart(); renderTickers(); selectTicker(db.tickers[0].code);
+  renderPlayers(); renderOrderbook();
+  setInterval(marketTick, 1000);
+
+  // provide basic keyboard shortcuts for demo
+  window.addEventListener('keydown', (e)=>{
+    if(e.key==='/' && !authModal.classList.contains('hidden')){ el('login-user').focus(); }
+  });
+
+  </script>
 </body>
 </html>
