@@ -1,374 +1,317 @@
-<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Game Tài Xỉu - Bầu Cua - Chẵn Lẻ (Demo)</title>
-  <!-- Tailwind CDN for quick styling (works in AppsGeyser webview) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>/* small helpers */
-    .card{background:linear-gradient(180deg,#ffffff,#f8fafc);}
-  </style>
-</head>
-<body class="bg-slate-100 text-slate-800">
-  <div class="max-w-4xl mx-auto p-4">
-    <header class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">Tài Xỉu • Bầu Cua • Chẵn Lẻ — Demo</h1>
-      <div id="user-info" class="text-sm"></div>
+/*
+Stock Exchange Simulator (single-file React app)
+- Uses Tailwind CSS for styling (assume Tailwind set up in the project)
+- Uses lightweight-charts for candlestick charting
+- Simulates live price updates via a local WebSocket-like simulator
+- Includes: auth (user/admin), ticker list, watchlist, chart with timeframe buttons, buy/sell panel, admin panel
+
+Setup (recommended):
+1) Create a new Vite React app (or CRA):
+   npm create vite@latest stock-sim --template react
+   cd stock-sim
+2) Install deps:
+   npm install lightweight-charts uuid
+   npm install -D tailwindcss postcss autoprefixer
+   npx tailwindcss init -p
+   (configure tailwind per docs)
+3) Replace src/App.jsx with this file content and run:
+   npm run dev
+
+Note: This is a single-file demo. For production, split into components, add backend for auth, real market data, and a real WebSocket price feed.
+
+Admin default credentials (demo): username: admin   password: admin123
+CHANGE THEM in production!
+*/
+
+import React, { useEffect, useRef, useState } from 'react';
+import { createChart } from 'lightweight-charts';
+import { v4 as uuidv4 } from 'uuid';
+
+export default function App() {
+  // Simple in-memory users (demo)
+  const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [tickers, setTickers] = useState(getInitialTickers());
+  const [selectedTicker, setSelectedTicker] = useState(tickers[0].symbol);
+  const [timeframe, setTimeframe] = useState('1m');
+  const wsRef = useRef(null);
+
+  useEffect(() => {
+    // start simulator
+    wsRef.current = createPriceSimulator(tickers, onPriceUpdate);
+    return () => wsRef.current && wsRef.current.close();
+  }, []);
+
+  useEffect(() => {
+    // if a ticker is removed/added, ensure selectedTicker still exists
+    if (!tickers.find(t => t.symbol === selectedTicker)) {
+      setSelectedTicker(tickers[0]?.symbol || null);
+    }
+  }, [tickers]);
+
+  function onPriceUpdate(update) {
+    // update tickers state with new price
+    setTickers(prev => prev.map(t => t.symbol === update.symbol ? { ...t, price: update.price, change: +(100 * (update.price - t.lastClose) / t.lastClose).toFixed(2) } : t));
+  }
+
+  function handleLogin(username, password) {
+    if (username === 'admin' && password === 'admin123') {
+      setUser({ id: 'admin', name: 'Administrator' });
+      setIsAdmin(true);
+      return true;
+    }
+    // demo: any username/password logs in as regular user
+    setUser({ id: uuidv4(), name: username });
+    setIsAdmin(false);
+    return true;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      <Header user={user} onLogin={handleLogin} onLogout={() => { setUser(null); setIsAdmin(false); }} />
+      <main className="max-w-7xl mx-auto p-4 grid grid-cols-12 gap-4">
+        <aside className="col-span-3 bg-white p-3 rounded-lg shadow h-[70vh] overflow-auto">
+          <TickerList tickers={tickers} onSelect={setSelectedTicker} selected={selectedTicker} />
+        </aside>
+        <section className="col-span-6 bg-white p-3 rounded-lg shadow h-[70vh] flex flex-col">
+          <ChartPanel symbol={selectedTicker} timeframe={timeframe} onTimeframeChange={setTimeframe} />
+        </section>
+        <aside className="col-span-3 bg-white p-3 rounded-lg shadow h-[70vh] flex flex-col">
+          <OrderPanel symbol={selectedTicker} tickers={tickers} />
+          {isAdmin && <AdminPanel tickers={tickers} setTickers={setTickers} />}
+        </aside>
+      </main>
+    </div>
+  );
+}
+
+function Header({ user, onLogin, onLogout }) {
+  return (
+    <header className="bg-white shadow">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="text-2xl font-bold">MiniInvest</div>
+          <div className="text-sm text-gray-500">Market / Equities / United States</div>
+        </div>
+        <div className="flex items-center gap-4">
+          <SearchBox />
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="text-sm">Hello, <strong>{user.name}</strong></div>
+              <button className="px-3 py-1 bg-red-50 text-red-600 rounded" onClick={onLogout}>Logout</button>
+            </div>
+          ) : (
+            <LoginForm onLogin={onLogin} />
+          )}
+        </div>
+      </div>
     </header>
+  );
+}
 
-    <main class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <!-- Auth / Account -->
-      <section class="card p-4 rounded-lg shadow">
-        <h2 class="font-semibold mb-2">Đăng nhập / Đăng ký</h2>
-        <form id="auth-form" class="space-y-2">
-          <input id="username" placeholder="Tên đăng nhập" class="w-full p-2 border rounded" required />
-          <input id="password" type="password" placeholder="Mật khẩu" class="w-full p-2 border rounded" required />
-          <div class="flex gap-2">
-            <button id="login-btn" type="button" class="px-3 py-2 bg-blue-600 text-white rounded">Đăng nhập</button>
-            <button id="register-btn" type="button" class="px-3 py-2 bg-green-600 text-white rounded">Đăng ký</button>
+function SearchBox() {
+  const [q, setQ] = useState('');
+  return (
+    <div className="relative">
+      <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickers or companies" className="px-3 py-2 border rounded w-72" />
+      <div className="absolute right-1 top-1 text-sm text-gray-500">⌕</div>
+    </div>
+  );
+}
+
+function LoginForm({ onLogin }) {
+  const [open, setOpen] = useState(false);
+  const [u, setU] = useState('');
+  const [p, setP] = useState('');
+  return (
+    <div>
+      {!open ? <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={() => setOpen(true)}>Login</button> : (
+        <div className="p-3 bg-white border rounded shadow-lg absolute right-4 mt-12">
+          <input className="block mb-2 p-2 border rounded" placeholder="Username" value={u} onChange={e=>setU(e.target.value)} />
+          <input type="password" className="block mb-2 p-2 border rounded" placeholder="Password" value={p} onChange={e=>setP(e.target.value)} />
+          <div className="flex gap-2">
+            <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={() => { onLogin(u||'guest', p); setOpen(false); }}>Sign in</button>
+            <button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setOpen(false)}>Cancel</button>
           </div>
-          <p class="text-xs text-slate-500">Demo: admin/admin123 (hãy đổi ngay trong Admin)</p>
-        </form>
-
-        <hr class="my-3" />
-        <div class="text-sm">
-          <strong>Số dư:</strong> <span id="balance">-</span><br>
-          <strong>Lịch sử:</strong>
-          <div id="history" class="h-32 overflow-auto text-xs mt-2 p-2 bg-white border rounded"></div>
         </div>
-      </section>
+      )}
+    </div>
+  );
+}
 
-      <!-- Game selection -->
-      <section class="card p-4 rounded-lg shadow md:col-span-2">
-        <h2 class="font-semibold mb-2">Chọn trò chơi & đặt cược</h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div class="p-3 bg-white border rounded">
-            <h3 class="font-medium">Tài / Xỉu</h3>
-            <p class="text-xs text-slate-500">Tài: tổng 11-17, Xỉu: 4-10. (Quy tắc demo: ba viên giống nhau -> cược tài/xỉu thua)</p>
-            <input id="tx-amount" type="number" min="100" step="100" placeholder="Số tiền" class="w-full p-2 border rounded my-2" />
-            <div class="flex gap-2">
-              <button data-game="taixiu" data-choice="tai" class="bet-btn px-3 py-2 bg-indigo-600 text-white rounded">Chọn Tài</button>
-              <button data-game="taixiu" data-choice="xiu" class="bet-btn px-3 py-2 bg-indigo-400 text-white rounded">Chọn Xỉu</button>
+function TickerList({ tickers, onSelect, selected }) {
+  return (
+    <div>
+      <h3 className="font-semibold mb-3">Top US Equities</h3>
+      <ul className="space-y-2">
+        {tickers.map(t => (
+          <li key={t.symbol} className={`p-2 rounded hover:bg-gray-50 cursor-pointer ${selected===t.symbol? 'bg-gray-100':''}`} onClick={()=>onSelect(t.symbol)}>
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="font-medium">{t.symbol}</div>
+                <div className="text-xs text-gray-500">{t.name}</div>
+              </div>
+              <div className="text-right">
+                <div className="font-semibold">{t.price.toFixed(2)}</div>
+                <div className={`text-sm ${t.change>=0? 'text-green-600':'text-red-600'}`}>{t.change>=0?'+':''}{t.change.toFixed(2)}%</div>
+              </div>
             </div>
-          </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
-          <div class="p-3 bg-white border rounded">
-            <h3 class="font-medium">Bầu Cua</h3>
-            <p class="text-xs text-slate-500">Chọn 1 trong 6 mặt: Bầu, Cua, Tôm, Cá, Gà, Nai</p>
-            <select id="bc-face" class="w-full p-2 border rounded my-2">
-              <option value="bau">Bầu</option>
-              <option value="cua">Cua</option>
-              <option value="tom">Tôm</option>
-              <option value="ca">Cá</option>
-              <option value="ga">Gà</option>
-              <option value="nai">Nai</option>
-            </select>
-            <input id="bc-amount" type="number" min="100" step="100" placeholder="Số tiền" class="w-full p-2 border rounded my-2" />
-            <button data-game="baucua" class="bet-btn w-full px-3 py-2 bg-rose-600 text-white rounded">Đặt cược</button>
-          </div>
+function ChartPanel({ symbol, timeframe, onTimeframeChange }) {
+  const chartRef = useRef(null);
+  const candleSeriesRef = useRef(null);
+  useEffect(() => {
+    const chartDiv = chartRef.current;
+    chartDiv.innerHTML = '';
+    const chart = createChart(chartDiv, { width: chartDiv.clientWidth, height: 420, layout: { backgroundColor: '#ffffff', textColor: '#333' } });
+    const candleSeries = chart.addCandlestickSeries();
+    candleSeriesRef.current = candleSeries;
+    // load initial mock data
+    const data = generateMockCandles(symbol, timeframe, 200);
+    candleSeries.setData(data);
+    // subscribe to simulated live ticks (in real app use WebSocket)
+    const id = setInterval(()=>{
+      const last = data[data.length-1];
+      const next = generateNextCandle(last);
+      data.push(next);
+      if (data.length>500) data.shift();
+      candleSeries.setData(data);
+    }, 1000);
+    function handleResize() { chart.applyOptions({ width: chartDiv.clientWidth }); }
+    window.addEventListener('resize', handleResize);
+    return ()=>{ clearInterval(id); window.removeEventListener('resize', handleResize); chart.remove(); };
+  }, [symbol, timeframe]);
 
-          <div class="p-3 bg-white border rounded">
-            <h3 class="font-medium">Chẵn / Lẻ</h3>
-            <p class="text-xs text-slate-500">Dựa trên tổng ba xúc xắc</p>
-            <input id="cl-amount" type="number" min="100" step="100" placeholder="Số tiền" class="w-full p-2 border rounded my-2" />
-            <div class="flex gap-2">
-              <button data-game="chanle" data-choice="chan" class="bet-btn px-3 py-2 bg-emerald-600 text-white rounded">Chẵn</button>
-              <button data-game="chanle" data-choice="le" class="bet-btn px-3 py-2 bg-amber-600 text-white rounded">Lẻ</button>
-            </div>
-          </div>
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="font-bold">{symbol}</h2>
+        <div className="flex gap-2">
+          {['1m','5m','15m','30m','1h','1d'].map(tf => (
+            <button key={tf} onClick={()=>onTimeframeChange(tf)} className={`px-2 py-1 rounded ${timeframe===tf? 'bg-blue-600 text-white':'bg-gray-100'}`}>{tf}</button>
+          ))}
         </div>
+      </div>
+      <div ref={chartRef} className="flex-1" />
+    </div>
+  );
+}
 
-        <hr class="my-3" />
-        <div class="flex items-center gap-3">
-          <button id="spin-btn" class="px-4 py-2 bg-slate-900 text-white rounded">Quay xúc xắc (Spin)</button>
-          <div id="result-area" class="text-sm"></div>
-        </div>
+function OrderPanel({ symbol, tickers }) {
+  const [side, setSide] = useState('buy');
+  const [qty, setQty] = useState(1);
+  const price = tickers.find(t=>t.symbol===symbol)?.price || 0;
+  function submit() {
+    alert(`${side.toUpperCase()} ${qty} ${symbol} @ ${price.toFixed(2)} (demo only)`);
+  }
+  return (
+    <div className="mb-4">
+      <h3 className="font-medium mb-2">Place Order</h3>
+      <div className="flex gap-2 mb-2">
+        <button className={`flex-1 py-2 rounded ${side==='buy'?'bg-green-600 text-white':'bg-gray-100'}`} onClick={()=>setSide('buy')}>Buy</button>
+        <button className={`flex-1 py-2 rounded ${side==='sell'?'bg-red-600 text-white':'bg-gray-100'}`} onClick={()=>setSide('sell')}>Sell</button>
+      </div>
+      <div className="mb-2">
+        <label className="block text-xs text-gray-600">Quantity</label>
+        <input type="number" value={qty} min={1} onChange={e=>setQty(Number(e.target.value))} className="w-full p-2 border rounded" />
+      </div>
+      <div className="text-sm text-gray-600 mb-2">Price: <strong>{price.toFixed(2)}</strong></div>
+      <button onClick={submit} className="w-full py-2 rounded bg-blue-600 text-white">Submit Order</button>
+    </div>
+  );
+}
 
-        <div class="mt-3 p-3 bg-white border rounded text-sm" id="last-round">Kết quả: —</div>
-      </section>
-
-      <!-- Admin panel (hidden until admin login) -->
-      <section id="admin-panel" class="card p-4 rounded-lg shadow hidden md:col-span-3">
-        <h2 class="font-semibold mb-2">Admin — Quản lý</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div class="p-3 bg-white border rounded">
-            <h3 class="font-medium">Người chơi</h3>
-            <div id="user-list" class="text-xs h-48 overflow-auto mt-2"></div>
+function AdminPanel({ tickers, setTickers }) {
+  const [sym, setSym] = useState('');
+  const [name, setName] = useState('');
+  function addTicker() {
+    if (!sym) return;
+    setTickers(prev => [{ symbol: sym.toUpperCase(), name: name||sym.toUpperCase(), price: 100, lastClose: 100, change: 0 }, ...prev]);
+    setSym(''); setName('');
+  }
+  function remove(symbol) {
+    setTickers(prev => prev.filter(t=>t.symbol!==symbol));
+  }
+  return (
+    <div className="mt-4 border-t pt-3">
+      <h4 className="font-semibold mb-2">Admin</h4>
+      <div className="mb-2">
+        <input placeholder="Symbol" value={sym} onChange={e=>setSym(e.target.value)} className="w-full p-2 border rounded mb-2" />
+        <input placeholder="Name" value={name} onChange={e=>setName(e.target.value)} className="w-full p-2 border rounded mb-2" />
+        <div className="flex gap-2"><button className="flex-1 py-2 bg-indigo-600 text-white rounded" onClick={addTicker}>Add</button></div>
+      </div>
+      <div className="text-sm">
+        {tickers.slice(0,6).map(t=> (
+          <div key={t.symbol} className="flex items-center justify-between py-1">
+            <div>{t.symbol} — {t.name}</div>
+            <button className="text-sm text-red-600" onClick={()=>remove(t.symbol)}>Remove</button>
           </div>
-          <div class="p-3 bg-white border rounded">
-            <h3 class="font-medium">Hành động</h3>
-            <input id="admin-target" placeholder="username" class="w-full p-2 border rounded my-2" />
-            <input id="admin-amount" type="number" placeholder="Số tiền (+/-)" class="w-full p-2 border rounded my-2" />
-            <button id="admin-adjust" class="w-full px-3 py-2 bg-yellow-600 text-white rounded">Điều chỉnh số dư</button>
-            <hr class="my-2" />
-            <button id="admin-reset" class="w-full px-3 py-2 bg-red-600 text-white rounded">Reset dữ liệu (demo)</button>
-          </div>
-          <div class="p-3 bg-white border rounded">
-            <h3 class="font-medium">Cấu hình</h3>
-            <label class="text-xs">Admin user:</label>
-            <input id="admin-user" class="w-full p-2 border rounded my-2" />
-            <label class="text-xs">Admin pass (mật khẩu plaintext để demo)</label>
-            <input id="admin-pass" class="w-full p-2 border rounded my-2" />
-            <button id="admin-save-creds" class="w-full px-3 py-2 bg-sky-600 text-white rounded">Lưu</button>
-          </div>
-        </div>
-      </section>
-
-    </main>
-
-    <footer class="mt-6 text-xs text-slate-500">Lưu ý: Đây là bản demo chạy hoàn toàn phía client (không dùng tiền thật). Để đưa lên AppsGeyser tải file này làm WebView hoặc host trên web có HTTPS rồi nhập URL vào AppsGeyser.</footer>
-  </div>
-
-<script>
-// ---- Simple client-side "server" using localStorage (DEMO ONLY) ----
-const DB = {
-  key: 'txbc_demo_v1',
-  load(){
-    const raw = localStorage.getItem(this.key);
-    if(!raw){
-      const init = {
-        users: { 'admin': { username:'admin', salt: '', passHash: '', balance: 1000000, isAdmin:true } },
-        rounds: [],
-        config:{ adminUser:'admin', adminPass:'admin123' }
-      };
-      localStorage.setItem(this.key, JSON.stringify(init));
-      return init;
-    }
-    return JSON.parse(raw);
-  },
-  save(state){ localStorage.setItem(this.key, JSON.stringify(state)); }
+        ))}
+      </div>
+    </div>
+  );
 }
-let STATE = DB.load();
 
-// On first run, if admin pass not set, store hashed admin123
-(async function ensureAdmin(){
-  if(!STATE.users.admin.passHash || STATE.users.admin.passHash===''){
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const passHash = await hashPassword('admin123', salt);
-    STATE.users.admin.salt = ab2hex(salt);
-    STATE.users.admin.passHash = passHash;
-    STATE.users.admin.isAdmin = true;
-    DB.save(STATE);
-    STATE.config.adminPass = 'admin123';
+// ------------------ Helpers & Mock Data ------------------
+
+function getInitialTickers(){
+  // a small selection simulating US equities
+  return [
+    { symbol: 'AAPL', name: 'Apple Inc.', price: 172.26, lastClose: 170.25, change: +1.18 },
+    { symbol: 'MSFT', name: 'Microsoft Corp.', price: 333.92, lastClose: 330.12, change: +1.15 },
+    { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 140.51, lastClose: 139.30, change: +0.86 },
+    { symbol: 'TSLA', name: 'Tesla Inc.', price: 253.45, lastClose: 250.10, change: +1.34 },
+    { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 151.22, lastClose: 150.00, change: +0.81 },
+    { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 720.13, lastClose: 710.00, change: +1.44 },
+  ];
+}
+
+function createPriceSimulator(initialTickers, onUpdate) {
+  // returns an object with close method to stop simulation
+  let running = true;
+  const timers = [];
+  initialTickers.forEach(t => {
+    const id = setInterval(() => {
+      if (!running) return;
+      const changePct = (Math.random() - 0.5) * 0.5; // ±0.25%
+      const newPrice = +(t.price * (1 + changePct/100)).toFixed(2);
+      t.price = newPrice;
+      onUpdate({ symbol: t.symbol, price: newPrice });
+    }, 1000 + Math.random()*1500);
+    timers.push(id);
+  });
+  return {
+    close: () => { running=false; timers.forEach(id=>clearInterval(id)); }
+  };
+}
+
+function generateMockCandles(symbol, timeframe, count=200) {
+  // generate simple synthetic candle data
+  const base = 100 + (symbol.charCodeAt(0)%50);
+  const data = [];
+  let t = Date.now()/1000 - count*60;
+  let lastClose = base;
+  for (let i=0;i<count;i++){
+    const o = +(lastClose * (1 + (Math.random()-0.5)/200)).toFixed(2);
+    const c = +(o * (1 + (Math.random()-0.5)/50)).toFixed(2);
+    const h = Math.max(o,c) * (1 + Math.random()/100);
+    const l = Math.min(o,c) * (1 - Math.random()/100);
+    data.push({ time: Math.floor(t), open: o, high: +h.toFixed(2), low: +l.toFixed(2), close: +c.toFixed(2) });
+    lastClose = c;
+    t += 60; // advance 1 minute
   }
-})();
-
-// --- utils ---
-function ab2hex(buf){ return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
-function hex2ab(hex){ const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(h=>parseInt(h,16))); return bytes.buffer; }
-async function hashPassword(pass, salt){
-  // PBKDF2 with SHA-256, 100k iterations (client-side; OK for demo). In prod do server-side!
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey('raw', enc.encode(pass),'PBKDF2',false,['deriveBits']);
-  const derived = await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'}, key, 256);
-  return ab2hex(derived);
+  return data;
 }
-
-function cryptoRandInt(max){ // secure random int [0,max)
-  const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
-  return array[0] % max;
+function generateNextCandle(last){
+  const o = last.close;
+  const c = +(o * (1 + (Math.random()-0.5)/100)).toFixed(2);
+  const h = Math.max(o,c) * (1 + Math.random()/200);
+  const l = Math.min(o,c) * (1 - Math.random()/200);
+  return { time: last.time+60, open: o, high: +h.toFixed(2), low: +l.toFixed(2), close: c };
 }
-
-function saveState(){ DB.save(STATE); }
-
-// --- Auth ---
-let currentUser = null;
-async function register(username, password){
-  username = username.trim().toLowerCase();
-  if(STATE.users[username]) throw 'Tên người dùng đã tồn tại';
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const passHash = await hashPassword(password, salt);
-  STATE.users[username] = { username, salt: ab2hex(salt), passHash, balance: 10000, isAdmin:false };
-  saveState();
-}
-async function login(username, password){
-  username = username.trim().toLowerCase();
-  const u = STATE.users[username];
-  if(!u) throw 'Người dùng không tồn tại';
-  const salt = hex2ab(u.salt);
-  const passHash = await hashPassword(password, salt);
-  if(passHash !== u.passHash) throw 'Mật khẩu sai';
-  currentUser = u;
-  renderUser();
-}
-function logout(){ currentUser = null; renderUser(); }
-
-// --- UI wiring ---
-const userInfoEl = document.getElementById('user-info');
-const balanceEl = document.getElementById('balance');
-const historyEl = document.getElementById('history');
-const lastRoundEl = document.getElementById('last-round');
-const adminPanel = document.getElementById('admin-panel');
-
-function renderUser(){
-  if(currentUser){
-    userInfoEl.innerHTML = `${currentUser.username} • <a href='#' id='logout'>Đăng xuất</a>`;
-    balanceEl.textContent = new Intl.NumberFormat().format(currentUser.balance) + ' VNĐ (ảo)';
-    document.getElementById('logout').onclick = (e)=>{ e.preventDefault(); logout(); };
-    // admin panel show
-    if(currentUser.isAdmin) adminPanel.classList.remove('hidden'); else adminPanel.classList.add('hidden');
-  } else {
-    userInfoEl.innerHTML = '';
-    balanceEl.textContent = '-';
-    adminPanel.classList.add('hidden');
-  }
-  // history
-  const rounds = (STATE.rounds||[]).slice().reverse();
-  historyEl.innerHTML = rounds.slice(0,40).map(r=>`<div>${r.time} — ${r.user} — ${r.msg}</div>`).join('');
-  renderUserList();
-}
-
-function renderUserList(){
-  const ul = document.getElementById('user-list');
-  ul.innerHTML = Object.values(STATE.users).map(u=>`<div class='p-1 border-b'>${u.username} — ${new Intl.NumberFormat().format(u.balance)}</div>`).join('');
-}
-
-// --- Bets and spin ---
-let pendingBets = [];
-function addRoundLog(msg){
-  STATE.rounds.push({ time: new Date().toLocaleString(), msg, user: currentUser?currentUser.username:'(guest)' });
-  saveState(); renderUser();
-}
-
-function placeBet(bet){
-  if(!currentUser) { alert('Bạn phải đăng nhập để đặt cược'); return; }
-  if(bet.amount <=0 || isNaN(bet.amount)) return alert('Số tiền không hợp lệ');
-  if(currentUser.balance < bet.amount) return alert('Không đủ tiền');
-  // deduct immediately
-  currentUser.balance -= bet.amount;
-  STATE.users[currentUser.username].balance = currentUser.balance;
-  pendingBets.push({ ...bet, user: currentUser.username });
-  addRoundLog(`${currentUser.username} đặt ${bet.game} — ${JSON.stringify(bet)} — ${bet.amount}`);
-  saveState(); renderUser();
-}
-
-// Bet buttons
-document.querySelectorAll('.bet-btn').forEach(b=>b.addEventListener('click', (e)=>{
-  const btn = e.currentTarget;
-  const game = btn.dataset.game;
-  if(game==='taixiu'){
-    const choice = btn.dataset.choice;
-    const amt = parseInt(document.getElementById('tx-amount').value || 0);
-    placeBet({ game:'taixiu', choice, amount:amt });
-  } else if(game==='baucua'){
-    const face = document.getElementById('bc-face').value;
-    const amt = parseInt(document.getElementById('bc-amount').value || 0);
-    placeBet({ game:'baucua', face, amount:amt });
-  } else if(game==='chanle'){
-    const choice = btn.dataset.choice;
-    const amt = parseInt(document.getElementById('cl-amount').value || 0);
-    placeBet({ game:'chanle', choice, amount:amt });
-  }
-}));
-
-// Spin
-document.getElementById('spin-btn').addEventListener('click', ()=>{
-  if(pendingBets.length===0){ alert('Chưa có cược nào'); return; }
-  runRound();
-});
-
-function rollDie(){ return cryptoRandInt(6)+1; }
-
-function runRound(){
-  // roll 3 dice
-  const d1 = rollDie(), d2 = rollDie(), d3 = rollDie();
-  const faces = ['','bau','cua','tom','ca','ga','nai']; // 1..6
-  const faceNames = [null,'Bầu','Cua','Tôm','Cá','Gà','Nai'];
-  const diceFaces = [faces[d1], faces[d2], faces[d3]];
-  const sum = d1 + d2 + d3;
-  const isTriple = (d1===d2 && d2===d3);
-  const resText = `Xúc xắc: ${d1}, ${d2}, ${d3} — ${diceFaces.map(f=>f).join(', ')} — Tổng=${sum}`;
-
-  // process bets
-  const results = [];
-  for(const bet of pendingBets){
-    let win = 0;
-    if(bet.game==='taixiu'){
-      const side = (sum>=11 && sum<=17)?'tai':'xiu';
-      // demo rule: triple => all tài/xỉu lose
-      if(isTriple){ win = 0; }
-      else if(bet.choice===side){ win = bet.amount * 2; } // 1:1 payout (win gives back 2x incl stake)
-    } else if(bet.game==='baucua'){
-      // count occurrences
-      const count = diceFaces.filter(f=>f===bet.face).length;
-      if(count>0) win = bet.amount * (1 + count); // return stake + count * stake
-    } else if(bet.game==='chanle'){
-      const side = (sum%2===0)?'chan':'le';
-      if(bet.choice===side){ win = bet.amount * 2; }
-    }
-    // settle
-    if(win>0){
-      STATE.users[bet.user].balance += win;
-      results.push(`${bet.user} thắng ${new Intl.NumberFormat().format(win)} (${bet.game})`);
-    } else {
-      results.push(`${bet.user} thua ${new Intl.NumberFormat().format(bet.amount)} (${bet.game})`);
-    }
-  }
-
-  // record
-  const roundMsg = `${resText} — ${results.join(' | ')}`;
-  STATE.rounds.push({ time: new Date().toLocaleString(), msg: roundMsg, user:'system' });
-  saveState();
-  pendingBets = [];
-  lastRoundEl.textContent = roundMsg;
-  renderUser();
-}
-
-// --- Auth form handlers ---
-document.getElementById('register-btn').addEventListener('click', async ()=>{
-  const u = document.getElementById('username').value;
-  const p = document.getElementById('password').value;
-  try{ await register(u,p); alert('Đăng ký thành công — hãy đăng nhập'); }
-  catch(e){ alert('Lỗi: '+e); }
-});
-
-document.getElementById('login-btn').addEventListener('click', async ()=>{
-  const u = document.getElementById('username').value;
-  const p = document.getElementById('password').value;
-  try{ await login(u,p); alert('Đăng nhập thành công'); }
-  catch(e){ alert('Lỗi: '+e); }
-});
-
-// --- Admin actions ---
-document.getElementById('admin-adjust').addEventListener('click', ()=>{
-  const tgt = document.getElementById('admin-target').value.trim().toLowerCase();
-  const amt = parseInt(document.getElementById('admin-amount').value || 0);
-  if(!STATE.users[tgt]) return alert('Không tìm thấy user');
-  STATE.users[tgt].balance += amt;
-  saveState(); renderUser();
-  addRoundLog(`Admin thay đổi ${tgt} ${amt}`);
-});
-
-document.getElementById('admin-reset').addEventListener('click', ()=>{
-  if(!confirm('Bạn có chắc reset dữ liệu demo?')) return;
-  localStorage.removeItem(DB.key);
-  location.reload();
-});
-
-// Save admin creds (demo only)
-document.getElementById('admin-save-creds').addEventListener('click', ()=>{
-  const au = document.getElementById('admin-user').value.trim();
-  const ap = document.getElementById('admin-pass').value.trim();
-  if(!au||!ap) return alert('Nhập đủ');
-  // This demo simply stores plaintext in STATE.config for ease; in prod never do this
-  STATE.config.adminUser = au; STATE.config.adminPass = ap;
-  // also create user if not exists
-  if(!STATE.users[au]) STATE.users[au] = { username:au, salt:'', passHash:'', balance:100000, isAdmin:true };
-  STATE.users[au].isAdmin = true;
-  saveState(); alert('Lưu (demo). Để thay đổi mật khẩu admin thật, dùng chức năng đăng ký + đổi pass hoặc triển khai server.');
-});
-
-// initial render
-renderUser();
-
-// --- Notes for deploy to AppsGeyser:
-// 1) Save this file as index.html and upload to a web hosting (HTTPS recommended) OR directly paste HTML into AppsGeyser WebView if they accept raw HTML.
-// 2) AppsGeyser usually wraps your web page into an Android app; ensure you serve via HTTPS for best compatibility.
-// 3) THIS DEMO is purely client-side—sensitive operations (auth, wallets, payouts) MUST be moved to a secure server for a production app.
-
-</script>
-</body>
-</html>
