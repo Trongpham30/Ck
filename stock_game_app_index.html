@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stock Game - Single File</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    html,body,#app{height:100%}
+    .tick-up{color:#16a34a}
+    .tick-down{color:#dc2626}
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800" id="app">
+  <div class="max-w-6xl mx-auto p-4">
+    <header class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl font-bold">Stock Game (AppsGeyser-ready)</h1>
+      <div id="top-controls" class="flex items-center gap-3"></div>
+    </header>
+
+    <main class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <!-- Left: tickers + buy sell -->
+      <section class="md:col-span-1 bg-white p-4 rounded-lg shadow-sm">
+        <h2 class="font-semibold mb-2">Tickers</h2>
+        <div id="ticker-list" class="space-y-2 max-h-72 overflow-auto"></div>
+
+        <div class="mt-4">
+          <h3 class="font-semibold">Mua / Bán</h3>
+          <div class="space-y-2 mt-2">
+            <select id="trade-ticker" class="w-full p-2 border rounded"></select>
+            <input id="trade-qty" type="number" placeholder="Số lượng" class="w-full p-2 border rounded" value="1" />
+            <div class="grid grid-cols-2 gap-2">
+              <button id="buy-btn" class="p-2 bg-green-500 text-white rounded">Mua</button>
+              <button id="sell-btn" class="p-2 bg-red-500 text-white rounded">Bán</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <h3 class="font-semibold">Tài khoản</h3>
+          <div class="mt-2">
+            <div>Người dùng: <span id="ui-username">-</span></div>
+            <div>Tiền mặt: <span id="ui-cash">0</span> ₫</div>
+            <div>Giá trị danh mục: <span id="ui-portfolio-value">0</span> ₫</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Center: chart -->
+      <section class="md:col-span-2 bg-white p-4 rounded-lg shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold" id="chart-title">Biểu đồ</h2>
+          <div class="flex items-center gap-2">
+            <label class="text-sm">Candle (s)</label>
+            <input id="candle-interval" type="number" min="1" value="1" class="w-16 p-1 border rounded text-sm" />
+          </div>
+        </div>
+        <div id="chart" style="height:360px;"></div>
+
+        <div class="mt-3">
+          <h3 class="font-semibold">Lịch sử giao dịch</h3>
+          <div id="trade-history" class="mt-2 max-h-36 overflow-auto text-sm"></div>
+        </div>
+      </section>
+
+      <!-- Right: portfolio + admin -->
+      <section class="md:col-span-1 bg-white p-4 rounded-lg shadow-sm">
+        <h2 class="font-semibold">Danh mục</h2>
+        <div id="portfolio-list" class="mt-2 space-y-2 text-sm"></div>
+
+        <div class="mt-4">
+          <button id="btn-logout" class="w-full p-2 bg-gray-700 text-white rounded">Đăng xuất</button>
+        </div>
+
+        <hr class="my-4">
+        <div>
+          <h3 class="font-semibold">Admin</h3>
+          <div class="mt-2">
+            <input id="admin-pin" type="password" placeholder="Mã PIN admin" class="w-full p-2 border rounded" />
+            <button id="admin-login" class="w-full mt-2 p-2 bg-indigo-600 text-white rounded">Đăng nhập admin</button>
+          </div>
+          <div id="admin-panel" class="mt-3 hidden">
+            <h4 class="font-semibold">Quản lý người chơi</h4>
+            <div id="admin-players" class="max-h-28 overflow-auto text-sm mt-2"></div>
+            <h4 class="font-semibold mt-3">Quản lý tickers</h4>
+            <div class="mt-2 space-y-2">
+              <input id="new-ticker-code" placeholder="Mã (VD: AAPL)" class="w-full p-2 border rounded" />
+              <input id="new-ticker-name" placeholder="Tên" class="w-full p-2 border rounded" />
+              <input id="new-ticker-start" placeholder="Giá khởi điểm" class="w-full p-2 border rounded" />
+              <div class="grid grid-cols-2 gap-2">
+                <button id="add-ticker" class="p-2 bg-green-500 text-white rounded">Thêm</button>
+                <button id="reset-data" class="p-2 bg-yellow-500 text-white rounded">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Login modal -->
+    <div id="login-modal" class="fixed inset-0 flex items-center justify-center bg-black/40">
+      <div class="bg-white p-6 rounded-lg w-full max-w-md">
+        <h2 class="text-xl font-semibold mb-3">Đăng nhập / Tạo tài khoản</h2>
+        <input id="login-username" placeholder="Tên người chơi" class="w-full p-2 border rounded mb-2" />
+        <input id="login-pin" placeholder="Mã PIN (4 số)" class="w-full p-2 border rounded mb-2" />
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btn-login" class="p-2 bg-blue-600 text-white rounded">Đăng nhập</button>
+          <button id="btn-register" class="p-2 bg-green-600 text-white rounded">Tạo tài khoản mới</button>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Admin mặc định: PIN <strong id="default-admin-pin">1234</strong> (có thể đổi trong Admin)</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+  /**
+   * Stock Game - single-file app
+   * - All data stored in localStorage for AppsGeyser static hosting
+   * - Updates prices every second
+   * - Admin can manage players and tickers
+   */
+
+  // --------- Utilities ---------
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const now = () => new Date().toISOString();
+
+  // --------- Default data ---------
+  const DEFAULT_ADMIN_PIN = '1234';
+  const DEFAULT_CASH = 100000000; // 100,000,000 ₫
+
+  const sampleTickers = {
+    AAPL: { code: 'AAPL', name: 'Apple', price: 170, vol: 0.6 },
+    GOOGL: { code: 'GOOGL', name: 'Alphabet', price: 135, vol: 0.8 },
+    TSLA: { code: 'TSLA', name: 'Tesla', price: 250, vol: 1.4 }
+  };
+
+  // --------- Storage helpers ---------
+  function loadState(){
+    const s = JSON.parse(localStorage.getItem('sg_state') || '{}');
+    if(!s.tickers) s.tickers = sampleTickers;
+    if(!s.users) s.users = {};
+    if(!s.adminPin) s.adminPin = DEFAULT_ADMIN_PIN;
+    if(!s.settings) s.settings = { candleIntervalSec: 1 };
+    return s;
+  }
+  function saveState(s){ localStorage.setItem('sg_state', JSON.stringify(s)); }
+
+  let state = loadState();
+
+  // --------- Current session ---------
+  let currentUser = null; // username
+
+  // --------- Price engine ---------
+  // For each ticker keep lastPrice and candle array for chart
+  const engine = {
+    series: {}, // code -> {price, candles: [{time, open, high, low, close}]}
+    init(){
+      for(const [k,v] of Object.entries(state.tickers)){
+        this.series[k] = this.series[k] || { price: v.price, candles: [] };
+        this.series[k].price = v.price;
+      }
+    },
+    step(){
+      const nowSec = Math.floor(Date.now()/1000);
+      for(const [code,meta] of Object.entries(state.tickers)){
+        const s = this.series[code] || {price: meta.price, candles: []};
+        // random walk with volatility
+        const vol = meta.vol || 0.8; // percent-ish
+        const changePct = (Math.random()*2-1) * vol/100; // e.g. 1% -> 0.01
+        const newPrice = Math.max(0.01, s.price * (1 + changePct));
+
+        // Candle interval
+        const candleSec = Math.max(1, Number(document.getElementById('candle-interval').value || 1));
+        const bucket = Math.floor(Date.now()/1000 / candleSec) * candleSec;
+        let candles = s.candles;
+        if(!candles.length || candles[candles.length-1].time !== bucket){
+          // start new candle
+          const candle = { time: bucket, open: s.price, high: newPrice, low: newPrice, close: newPrice };
+          candles.push(candle);
+        } else {
+          const c = candles[candles.length-1];
+          c.high = Math.max(c.high, newPrice);
+          c.low = Math.min(c.low, newPrice);
+          c.close = newPrice;
+        }
+
+        s.price = newPrice;
+        this.series[code] = s;
+      }
+    }
+  };
+
+  engine.init();
+
+  // --------- UI references ---------
+  const el = {
+    tickerList: document.getElementById('ticker-list'),
+    tradeTicker: document.getElementById('trade-ticker'),
+    tradeQty: document.getElementById('trade-qty'),
+    buyBtn: document.getElementById('buy-btn'),
+    sellBtn: document.getElementById('sell-btn'),
+    uiUsername: document.getElementById('ui-username'),
+    uiCash: document.getElementById('ui-cash'),
+    uiPortfolioValue: document.getElementById('ui-portfolio-value'),
+    portfolioList: document.getElementById('portfolio-list'),
+    tradeHistory: document.getElementById('trade-history'),
+    chartTitle: document.getElementById('chart-title'),
+    candleInterval: document.getElementById('candle-interval'),
+    loginModal: document.getElementById('login-modal'),
+    loginUsername: document.getElementById('login-username'),
+    loginPin: document.getElementById('login-pin'),
+    btnLogin: document.getElementById('btn-login'),
+    btnRegister: document.getElementById('btn-register'),
+    adminPin: document.getElementById('admin-pin'),
+    adminLogin: document.getElementById('admin-login'),
+    adminPanel: document.getElementById('admin-panel'),
+    adminPlayers: document.getElementById('admin-players'),
+    newTickerCode: document.getElementById('new-ticker-code'),
+    newTickerName: document.getElementById('new-ticker-name'),
+    newTickerStart: document.getElementById('new-ticker-start'),
+    addTicker: document.getElementById('add-ticker'),
+    resetData: document.getElementById('reset-data'),
+    defaultAdminPin: document.getElementById('default-admin-pin'),
+    btnLogout: document.getElementById('btn-logout'),
+    topControls: document.getElementById('top-controls')
+  };
+
+  el.defaultAdminPin.textContent = state.adminPin || DEFAULT_ADMIN_PIN;
+
+  // --------- Chart (lightweight-charts) ---------
+  const chart = LightweightCharts.createChart(document.getElementById('chart'));
+  let candleSeries = chart.addCandlestickSeries();
+  let currentChartTicker = Object.keys(state.tickers)[0];
+
+  function rebuildChartFor(code){
+    currentChartTicker = code;
+    el.chartTitle.textContent = `Biểu đồ — ${code} ${state.tickers[code].name || ''}`;
+    const s = engine.series[code];
+    const data = (s && s.candles) ? s.candles.map(c=>({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })) : [];
+    candleSeries.setData(data);
+    chart.timeScale().fitContent();
+  }
+
+  // --------- Render tickers list ---------
+  function renderTickers(){
+    el.tickerList.innerHTML = '';
+    el.tradeTicker.innerHTML = '';
+    Object.keys(state.tickers).sort().forEach(code=>{
+      const t = state.tickers[code];
+      const s = engine.series[code] || {price: t.price};
+      const price = s.price;
+      const div = document.createElement('div');
+      div.className = 'flex items-center justify-between p-2 border rounded';
+      div.innerHTML = `<div>
+        <div class=\"font-semibold\">${code} <span class=\"text-xs text-slate-500\">${t.name||''}</span></div>
+        <div class=\"text-sm\">Giá: <span class=\"price-${code}\">${fmt(price.toFixed(2))}</span></div>
+      </div>
+      <div class=\"flex flex-col gap-1\">
+        <button data-code=\"${code}\" class=\"open-chart p-1 bg-slate-100 rounded text-sm\">Mở</button>
+        <button data-code=\"${code}\" class=\"watch p-1 bg-slate-100 rounded text-sm\">Chọn</button>
+      </div>`;
+      el.tickerList.appendChild(div);
+
+      const opt = document.createElement('option'); opt.value = code; opt.textContent = code; el.tradeTicker.appendChild(opt);
+    });
+  }
+
+  // --------- User / Portfolio operations ---------
+  function ensureUserExists(username){
+    state.users = state.users || {};
+    if(!state.users[username]){
+      state.users[username] = { cash: DEFAULT_CASH, positions: {}, history: [] };
+      saveState(state);
+    }
+  }
+
+  function loginUser(username, pin){
+    ensureUserExists(username);
+    // For simplicity PIN isn't stored per-user, but user must enter a 4-digit pin to 'login'
+    currentUser = username;
+    el.loginModal.style.display = 'none';
+    renderUI();
+  }
+
+  function logout(){ currentUser = null; el.loginModal.style.display = 'flex'; renderUI(); }
+
+  function buy(ticker, qty){
+    qty = Number(qty);
+    if(!currentUser) return alert('Đăng nhập trước');
+    const price = engine.series[ticker].price;
+    const cost = price * qty;
+    const u = state.users[currentUser];
+    if(u.cash < cost) return alert('Không đủ tiền');
+    u.cash -= cost;
+    u.positions[ticker] = (u.positions[ticker] || 0) + qty;
+    const rec = { time: now(), type: 'BUY', code: ticker, qty, price };
+    u.history.unshift(rec);
+    saveState(state);
+    renderUI();
+  }
+  function sell(ticker, qty){
+    qty = Number(qty);
+    if(!currentUser) return alert('Đăng nhập trước');
+    const price = engine.series[ticker].price;
+    const u = state.users[currentUser];
+    if((u.positions[ticker] || 0) < qty) return alert('Không đủ số lượng');
+    u.positions[ticker] -= qty;
+    u.cash += price * qty;
+    const rec = { time: now(), type: 'SELL', code: ticker, qty, price };
+    u.history.unshift(rec);
+    saveState(state);
+    renderUI();
+  }
+
+  // --------- Admin operations ---------
+  function adminLogin(pin){
+    if(pin === state.adminPin){
+      el.adminPanel.classList.remove('hidden');
+      renderAdminPlayers();
+    } else alert('PIN admin sai');
+  }
+
+  function addTicker(code,name,start){
+    code = (code||'').toUpperCase().trim();
+    if(!code) return alert('Mã trống');
+    state.tickers[code] = { code, name, price: Number(start) || 1, vol: 1 };
+    engine.series[code] = { price: Number(start) || 1, candles: [] };
+    saveState(state);
+    renderTickers();
+  }
+
+  function resetData(){
+    if(!confirm('Reset toàn bộ dữ liệu người chơi và tickers về mặc định?')) return;
+    state = { tickers: sampleTickers, users: {}, adminPin: DEFAULT_ADMIN_PIN, settings: { candleIntervalSec:1 } };
+    saveState(state);
+    engine.init();
+    location.reload();
+  }
+
+  function renderAdminPlayers(){
+    el.adminPlayers.innerHTML = '';
+    for(const [u,ud] of Object.entries(state.users)){
+      const div = document.createElement('div');
+      div.className = 'p-2 border rounded mb-1 flex items-center justify-between';
+      div.innerHTML = `<div><div class=\"font-semibold\">${u}</div><div class=\"text-xs\">Tiền: ${fmt(ud.cash)} ₫</div></div>
+        <div class=\"flex gap-1\"><button data-user=\"${u}\" class=\"set-cash p-1 bg-slate-100 rounded text-sm\">Set tiền</button><button data-user=\"${u}\" class=\"del-user p-1 bg-red-100 rounded text-sm\">Xóa</button></div>`;
+      el.adminPlayers.appendChild(div);
+    }
+    // hooks
+    el.adminPlayers.querySelectorAll('.del-user').forEach(btn=>btn.onclick = e=>{
+      const u = e.target.dataset.user;
+      if(confirm('Xóa người chơi '+u+'?')){ delete state.users[u]; saveState(state); renderAdminPlayers(); }
+    });
+    el.adminPlayers.querySelectorAll('.set-cash').forEach(btn=>btn.onclick = e=>{
+      const u = e.target.dataset.user;
+      const v = prompt('Nhập tiền mới cho '+u, String(state.users[u].cash));
+      if(v!==null){ state.users[u].cash = Number(v)||0; saveState(state); renderAdminPlayers(); }
+    });
+  }
+
+  // --------- Render UI ---------
+  function renderUI(){
+    renderTickers();
+    // username display
+    el.uiUsername.textContent = currentUser || '-';
+    if(currentUser){
+      const u = state.users[currentUser];
+      el.uiCash.textContent = fmt(u.cash);
+      // portfolio value
+      let pv = 0;
+      el.portfolioList.innerHTML = '';
+      for(const [code,qty] of Object.entries(u.positions)){
+        const p = engine.series[code] ? engine.series[code].price : (state.tickers[code] ? state.tickers[code].price:0);
+        pv += p*qty;
+        const div = document.createElement('div');
+        div.className = 'p-2 border rounded';
+        div.innerHTML = `<div class=\"flex items-center justify-between\"><div>${code} x ${qty}</div><div>${fmt((p*qty).toFixed(2))} ₫</div></div>`;
+        el.portfolioList.appendChild(div);
+      }
+      el.uiPortfolioValue.textContent = fmt(pv.toFixed(2));
+
+      // trade history
+      el.tradeHistory.innerHTML = '';
+      for(const h of (u.history||[])){
+        const d = document.createElement('div'); d.className='p-1 border-b';
+        d.innerHTML = `<div class=\"text-xs\">${h.time}</div><div>${h.type} ${h.code} x ${h.qty} @ ${fmt(h.price.toFixed(2))}</div>`;
+        el.tradeHistory.appendChild(d);
+      }
+    } else {
+      el.uiCash.textContent = '0';
+      el.uiPortfolioValue.textContent = '0';
+      el.portfolioList.innerHTML = '';
+    }
+
+    // update prices in ticker list
+    for(const code of Object.keys(state.tickers)){
+      const span = document.querySelector('.price-'+code);
+      if(span) span.textContent = fmt((engine.series[code].price).toFixed(2));
+    }
+  }
+
+  // --------- Events ---------
+  el.btnLogin.onclick = ()=>{
+    const u = el.loginUsername.value.trim();
+    const p = el.loginPin.value.trim();
+    if(!u || !p) return alert('Nhập tên và pin');
+    loginUser(u,p);
+  };
+  el.btnRegister.onclick = ()=>{
+    const u = el.loginUsername.value.trim();
+    const p = el.loginPin.value.trim();
+    if(!u || !p) return alert('Nhập tên và pin');
+    ensureUserExists(u);
+    loginUser(u,p);
+  };
+
+  el.buyBtn.onclick = ()=>{ buy(el.tradeTicker.value, Number(el.tradeQty.value||1)); };
+  el.sellBtn.onclick = ()=>{ sell(el.tradeTicker.value, Number(el.tradeQty.value||1)); };
+
+  el.adminLogin.onclick = ()=>{ adminLogin(el.adminPin.value.trim()); };
+  el.addTicker.onclick = ()=>{ addTicker(el.newTickerCode.value, el.newTickerName.value, Number(el.newTickerStart.value||1)); el.newTickerCode.value=''; el.newTickerName.value=''; el.newTickerStart.value=''; };
+  el.resetData.onclick = resetData;
+  el.btnLogout.onclick = logout;
+
+  // open chart buttons
+  document.addEventListener('click', e=>{
+    if(e.target.matches('.open-chart')){
+      const code = e.target.dataset.code; rebuildChartFor(code);
+    }
+  });
+
+  // set watch (set chart to that ticker)
+  document.addEventListener('click', e=>{
+    if(e.target.matches('.watch')){
+      const code = e.target.dataset.code; el.tradeTicker.value = code; rebuildChartFor(code);
+    }
+  });
+
+  // candle interval change -> rebuild candles
+  el.candleInterval.onchange = ()=>{ /* no-op, engine will use it next step */ };
+
+  // --------- Main loop ---------
+  function tick(){
+    engine.step();
+    // update UI prices
+    renderUI();
+    // update chart data for current symbol
+    const s = engine.series[currentChartTicker];
+    if(s && s.candles && s.candles.length){
+      candleSeries.setData(s.candles.map(c=>({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
+    }
+  }
+
+  // Start updating every second
+  setInterval(tick, 1000);
+
+  // Initialize UI
+  if(!currentUser) el.loginModal.style.display = 'flex'; else el.loginModal.style.display='none';
+  renderTickers();
+  rebuildChartFor(currentChartTicker);
+  renderUI();
+
+  // Small UX: top controls (export/import state)
+  const exp = document.createElement('button'); exp.className='p-2 bg-slate-100 rounded text-sm'; exp.textContent='Export State';
+  exp.onclick = ()=>{ const a = document.createElement('a'); a.href = 'data:application/json,'+encodeURIComponent(localStorage.getItem('sg_state')); a.download='sg_state.json'; a.click(); };
+  const imp = document.createElement('button'); imp.className='p-2 bg-slate-100 rounded text-sm'; imp.textContent='Import State';
+  imp.onclick = ()=>{
+    const file = document.createElement('input'); file.type='file'; file.accept='.json';
+    file.onchange = e=>{
+      const f = e.target.files[0]; const reader=new FileReader(); reader.onload=()=>{ localStorage.setItem('sg_state', reader.result); location.reload(); }; reader.readAsText(f);
+    }; file.click();
+  };
+  el.topControls.appendChild(exp); el.topControls.appendChild(imp);
+
+  </script>
+</body>
+</html>
